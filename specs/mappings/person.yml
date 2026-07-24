@@ -1,0 +1,80 @@
+version: 1
+target_table: person
+
+source_models:
+  - cai_01_patient
+
+# No joins are required because every visible mapping uses one source model.
+joins: []
+
+fields:
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_01_patient
+        field: patient_id
+    transformation: Cast patient_id to integer.
+
+  - target_field: gender_concept_id
+    action: map
+    source_fields:
+      - model: cai_01_patient
+        field: sex
+    transformation: >
+      Map Male, Female and null to concept IDs 8507, 8532 and 8570
+      respectively, as specified in the supplied mapping snapshot.
+    mapping_table_name:
+    review_required: true
+    review_status: approved
+    review_comment: >
+      Confirm that concept ID 8570 is the intended representation for a null
+      source value before using this mapping in production.
+
+  - target_field: year_of_birth
+    action: map
+    source_fields:
+      - model: cai_01_patient
+        field: year_of_birth
+    transformation: Cast year_of_birth to integer and copy it to the target field.
+    review_required: true
+    review_status: approved
+    review_comment: >
+      The snapshot also says to compute age, but age is not the target field.
+      Confirm whether any additional derived output is actually required.
+
+  - target_field: month_of_birth
+    action: skip
+    source_fields: []
+    transformation: Skip because the snapshot provides no source value.
+
+  - target_field: birth_datetime
+    action: skip
+    source_fields: []
+    transformation: Skip because the snapshot provides no source value.
+
+  - target_field: day_of_birth
+    action: skip
+    source_fields: []
+    transformation: Skip because the snapshot provides no source value.
+
+  - target_field: race_concept_id
+    action: derive
+    source_fields:
+      - model: cai_01_patient
+        field: indigenous_status
+      - model: cai_01_patient
+        field: country_of_birth
+    transformation: >
+      Map source values to race concept IDs using a controlled CSV seed or
+      mapping table. If only one mapping exists, a CASE expression may be used.
+    mapping_table_name:
+    review_required: true
+    review_status: approved
+    review_comment: >
+      The snapshot does not provide the source-to-concept values or the mapping
+      table location; these must be supplied before SQL generation.
+
+  - target_field: ethnicity_concept_id
+    action: "null"
+    source_fields: []
+    transformation: set to null

@@ -1,0 +1,19 @@
+provider: codex
+model: gpt-5.3-codex
+
+# Maximum generated tokens for each API request.
+max_output_tokens: 800
+
+# Refuse unexpectedly large initial prompts before loading the API provider.
+max_initial_prompt_characters: 12000
+
+# Disable automatic SDK retries while development spending is tightly controlled.
+max_api_retries: 0
+
+source:
+  reference_style: dbt_ref  # relation | dbt_ref | dbt_source
+
+output:
+  # Generate plain SQL unless the user explicitly selects another format.
+  format: dbt           # sql | dbt
+  dialect: snowflake    # snowflake | postgres | athena | bigquery

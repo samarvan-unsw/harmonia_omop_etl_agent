@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: cai_01_patient
+    description: The PATIENT table contains demographic information for each patient.
+
+    columns:
+      - name: patient_id
+        description: The unique primary identifier of the patient table.
+        primary_key: true
+
+      - name: lhd_patient_id
+        description: >
+          Patient identifier that is unique within an LHD. It is not shared
+          between LHDs, so different patients may have the same value and one
+          patient may have different values across LHDs.
+
+      - name: lhd
+        description: Name of the Local Health District that supplied the data.
+
+      - name: year_of_birth
+        description: The year the patient was born.
+
+      - name: sex
+        description: >
+          Sex or gender recorded for administrative purposes. It may differ
+          from biological sex or the individual's gender identity.
+
+      - name: country_of_birth
+        description: Country of birth declared by the patient or next of kin.
+
+      - name: indigenous_status
+        description: Australian Indigenous status declared by the patient or next of kin.

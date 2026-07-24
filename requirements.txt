@@ -1,0 +1,5 @@
+openai==2.47.0
+PyYAML==6.0.3
+python-dotenv==1.2.2
+pydantic==2.13.4
+sqlglot==30.13.0

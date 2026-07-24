@@ -1,0 +1,315 @@
+import argparse
+import json
+import os
+import sys
+from dataclasses import asdict, is_dataclass
+from datetime import datetime
+from pathlib import Path
+
+import yaml
+from dotenv import load_dotenv
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AuthenticationError,
+    BadRequestError,
+    OpenAIError,
+    PermissionDeniedError,
+    RateLimitError,
+)
+from pydantic import ValidationError
+
+from .context import build_context
+from .contracts import AgentConfig
+from .input_guard import initial_request_character_count
+from .loop import run_agent
+from .prompts import build_system_prompt, build_user_prompt
+from .tools import TOOL_SCHEMAS
+from .validation import (
+    SpecValidationError,
+    pending_review_fields,
+    validate_specs,
+)
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _api_error_message(error: OpenAIError) -> str:
+    """Return a concise API failure message without echoing request details."""
+    if isinstance(error, AuthenticationError):
+        return "OpenAI authentication failed; check OPENAI_API_KEY."
+    if isinstance(error, PermissionDeniedError):
+        return "OpenAI denied access to the configured project or model."
+    if isinstance(error, RateLimitError):
+        if getattr(error, "code", None) == "insufficient_quota":
+            return "OpenAI API quota is unavailable; check project billing or credits."
+        return "OpenAI API rate limit reached; retry later."
+    if isinstance(error, APITimeoutError):
+        return "OpenAI API request timed out."
+    if isinstance(error, APIConnectionError):
+        return "Could not connect to the OpenAI API."
+    if isinstance(error, BadRequestError):
+        return "OpenAI rejected the request; check the model and request configuration."
+    if isinstance(error, APIStatusError):
+        return f"OpenAI API returned HTTP {error.status_code}."
+    return "OpenAI API request failed."
+
+
+def _json_default(obj):
+    if is_dataclass(obj):
+        return asdict(obj)
+    raise TypeError(f"Not serializable: {type(obj)}")
+
+
+def _positive_int(value: str) -> int:
+    """Parse a command-line integer that must be greater than zero."""
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
+def _configured_output_token_ceiling(config: dict, max_iterations: int) -> int:
+    """Calculate the conservative generated-token ceiling for one CLI run."""
+    attempts_per_iteration = config["max_api_retries"] + 1
+    return (
+        config["max_output_tokens"]
+        * max_iterations
+        * attempts_per_iteration
+    )
+
+
+def _format_usage(usage: dict) -> str:
+    """Format measured provider usage without treating subsets as additive."""
+    return (
+        "Token usage: "
+        f"input={usage['input_tokens']} "
+        f"(cached={usage['cached_input_tokens']}, "
+        f"cache_write={usage['cache_write_input_tokens']}), "
+        f"output={usage['output_tokens']} "
+        f"(reasoning={usage['reasoning_output_tokens']}), "
+        f"total={usage['total_tokens']}, "
+        f"responses={usage['successful_api_responses']}"
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run the OMOP conversion agent for one target table.")
+    parser.add_argument("omop_table", help="OMOP table to build, e.g. person")
+    parser.add_argument(
+        "--max-iterations",
+        type=_positive_int,
+        default=2,
+        help="Maximum API generation attempts; defaults to 2.",
+    )
+    execution_mode = parser.add_mutually_exclusive_group()
+    execution_mode.add_argument(
+        "--generate",
+        action="store_true",
+        help="Allow the agent to call the configured API and generate SQL.",
+    )
+    execution_mode.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Explicitly validate without calling the API; this is the default.",
+    )
+    execution_mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview validated generation settings without calling the API.",
+    )
+    parser.add_argument(
+        "--dialect",
+        choices=["snowflake", "postgres", "athena", "bigquery"],
+        help="Override the configured SQL dialect.",
+    )
+    parser.add_argument(
+        "--output-format",
+        choices=["sql", "dbt"],
+        help="Override the configured output format.",
+    )
+    parser.add_argument(
+        "--source-style",
+        choices=["relation", "dbt_ref", "dbt_source"],
+        help="Override how source models are referenced.",
+    )
+    parser.add_argument(
+        "--source-name",
+        help="dbt source name; required when --source-style=dbt_source.",
+    )
+    parser.add_argument(
+        "--max-run-output-tokens",
+        type=_positive_int,
+        help=(
+            "Required with --generate; generation is refused when its "
+            "configured worst-case output-token ceiling exceeds this value."
+        ),
+    )
+    args = parser.parse_args()
+
+    load_dotenv(ROOT / ".env")
+    try:
+        raw_config = yaml.safe_load(
+            (ROOT / "config.yaml").read_text(encoding="utf-8")
+        )
+        if not isinstance(raw_config, dict):
+            raise ValueError("config.yaml must contain a mapping")
+
+        # Apply per-run choices before validating the final configuration.
+        if args.dialect:
+            raw_config["output"]["dialect"] = args.dialect
+        if args.output_format:
+            raw_config["output"]["format"] = args.output_format
+        if args.source_style:
+            raw_config["source"]["reference_style"] = args.source_style
+        if args.source_name:
+            raw_config["source"]["source_name"] = args.source_name
+
+        config_document = AgentConfig.model_validate(raw_config)
+    except (OSError, ValueError, yaml.YAMLError, ValidationError) as exc:
+        parser.error(f"Invalid config.yaml: {exc}")
+
+    config = config_document.model_dump()
+    output_token_ceiling = _configured_output_token_ceiling(
+        config,
+        args.max_iterations,
+    )
+
+    # Require an explicit per-run ceiling before any API-backed work begins.
+    if args.generate and args.max_run_output_tokens is None:
+        parser.error("--generate requires --max-run-output-tokens")
+    if (
+        args.generate
+        and output_token_ceiling > args.max_run_output_tokens
+    ):
+        parser.error(
+            "Configured generation can use up to "
+            f"{output_token_ceiling} output tokens, exceeding "
+            f"--max-run-output-tokens={args.max_run_output_tokens}. "
+            "Reduce --max-iterations or max_output_tokens."
+        )
+
+    specs_dir = ROOT / "specs"
+
+    try:
+        specs = validate_specs(args.omop_table, specs_dir)
+        context = build_context(args.omop_table, specs_dir)
+    except SpecValidationError as exc:
+        parser.error(str(exc))
+    pending_reviews = pending_review_fields(specs)
+    output_filename = f"{args.omop_table}.sql"
+    system_prompt = build_system_prompt(args.omop_table, config)
+    user_prompt = build_user_prompt(context, output_filename)
+    initial_request_characters = initial_request_character_count(
+        system_prompt,
+        user_prompt,
+        TOOL_SCHEMAS,
+    )
+    maximum_prompt_characters = config["max_initial_prompt_characters"]
+    input_limit_exceeded = (
+        initial_request_characters > maximum_prompt_characters
+    )
+
+    if args.dry_run:
+        output_path = ROOT / "output" / output_filename
+        print(f"Dry run passed for '{args.omop_table}'. No API call was made.")
+        print(f"Provider: {config['provider']}")
+        print(f"Model: {config['model']}")
+        print(f"Maximum output tokens per request: {config['max_output_tokens']}")
+        print(f"Automatic API retries: {config['max_api_retries']}")
+        print(f"Maximum generation attempts: {args.max_iterations}")
+        print(f"Worst-case run output-token ceiling: {output_token_ceiling}")
+        print(f"SQL dialect: {config['output']['dialect']}")
+        print(f"Output format: {config['output']['format']}")
+        print(f"Source reference style: {config['source']['reference_style']}")
+        print(f"Target file: {output_path}")
+        print(f"Context size: {len(context)} characters")
+        print(
+            "Initial request size: "
+            f"{initial_request_characters} / "
+            f"{maximum_prompt_characters} characters"
+        )
+        readiness_blockers = []
+        if pending_reviews:
+            readiness_blockers.append(
+                "pending reviews: " + ", ".join(pending_reviews)
+            )
+        if input_limit_exceeded:
+            readiness_blockers.append("initial request exceeds input limit")
+        if readiness_blockers:
+            print(
+                "Generation readiness: blocked by "
+                + "; ".join(readiness_blockers)
+            )
+        else:
+            print("Generation readiness: ready")
+        return
+
+    if not args.generate:
+        message = (
+            f"Validation passed for '{args.omop_table}': "
+            f"{len(specs.source_models)} source model(s), "
+            f"{len(specs.target_schema.fields)} target field(s), "
+            f"{len(context)} context characters. No API call was made."
+        )
+        if pending_reviews:
+            message += " Pending reviews: " + ", ".join(pending_reviews) + "."
+        print(message)
+        return
+
+    if pending_reviews:
+        parser.error(
+            "Generation blocked by pending mapping reviews: "
+            + ", ".join(pending_reviews)
+        )
+    if input_limit_exceeded:
+        parser.error(
+            "Initial API request size "
+            f"{initial_request_characters} characters exceeds configured limit "
+            f"{maximum_prompt_characters}"
+        )
+
+    print(
+        f"Running agent for '{args.omop_table}' using "
+        f"{config['provider']} ({config['model']}); "
+        f"output-token ceiling: {output_token_ceiling}."
+    )
+    try:
+        result = run_agent(
+            args.omop_table,
+            specs_dir,
+            config,
+            max_iterations=args.max_iterations,
+        )
+    except KeyError as exc:
+        parser.exit(
+            1,
+            f"Configuration error: missing environment variable {exc.args[0]}.\n",
+        )
+    except OpenAIError as exc:
+        parser.exit(1, f"API error: {_api_error_message(exc)}\n")
+
+    logs_dir = ROOT / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    log_path = logs_dir / f"{args.omop_table}_{timestamp}.json"
+    log_content = json.dumps(result, indent=2, default=_json_default)
+
+    # Create the transcript atomically with owner-only read/write permissions.
+    descriptor = os.open(
+        log_path,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        0o600,
+    )
+    with os.fdopen(descriptor, "w", encoding="utf-8") as log_file:
+        log_file.write(log_content)
+
+    print(f"Status: {result['status']} ({result['iterations']} iterations)")
+    print(_format_usage(result["usage"]))
+    print(f"Log: {log_path}")
+    if result["status"] != "done":
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
