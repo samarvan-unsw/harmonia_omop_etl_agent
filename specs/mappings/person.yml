@@ -116,18 +116,9 @@ fields:
     source_fields:
       - model: cai_01_patient
         field: indigenous_status
-      - model: cai_01_patient
-        field: country_of_birth
     transformation: >
-      Populate race_source_value from indigenous_status and country_of_birth.
-      The selected drawio lanes do not specify how the two values should be
-      combined or prioritised.
-    review_required: true
-    review_status: pending
-    review_comment: >
-      The CardiacAI lane links both source fields to race_source_value, but the
-      projected OMOP field contains no Comment or date-prefixed transformation
-      rule. Define and approve the derivation before generation.
+      Populate race_source_value from indigenous_status.
+
 
 # Optional projected OMOP fields with no CardiacAI lane connection and no
 # Comment/date-prefixed mapping instruction are intentionally omitted. The

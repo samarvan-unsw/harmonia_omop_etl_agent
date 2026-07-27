@@ -161,6 +161,9 @@ Interactive request documentation is available at
 `Authorization: Bearer <AGENT_API_TOKEN>`.
 Preflight reports generation readiness, prompt size, configured SQL settings
 and the worst-case output-token ceiling without creating an OpenAI client.
+API callers may supply validated project choices for SQL dialect, output
+format and source-reference style. Provider, model, prompt limits, token
+limits and retry policy always remain controlled by `config.yaml`.
 Generation requires the caller to confirm that exact current ceiling. The API
 returns only locally validated SQL and measured usage; it does not overwrite
 the CLI-managed file in `output/`. Only one API generation runs concurrently

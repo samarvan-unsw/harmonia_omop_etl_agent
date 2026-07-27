@@ -1,4 +1,4 @@
-# Cardiac AI OMOP Agent User Guide
+# CardiacAI OMOP Agent User Guide
 
 ## 1. What the agent does
 

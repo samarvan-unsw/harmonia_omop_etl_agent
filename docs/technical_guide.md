@@ -1,4 +1,4 @@
-# Cardiac AI OMOP Agent Technical Guide
+# CardiacAI OMOP Agent Technical Guide
 
 ## 1. Purpose and architecture
 
@@ -374,9 +374,10 @@ display by the CLI.
 
 ### Purpose
 
-Provides an optional versioned HTTP boundary for validation and generation
-preflight. It is separate from `agent.cli`, does not create a provider and
-never makes an OpenAI request.
+Provides an optional versioned HTTP boundary for validation, generation
+preflight and bounded SQL generation. It is separate from `agent.cli`.
+Validation and preflight never create a provider or make an OpenAI request;
+only the explicitly confirmed generation endpoint may do so.
 
 ### Endpoints
 
@@ -396,6 +397,20 @@ Request documents and total request content have bounded sizes. Error
 responses omit submitted values. API generation is limited to one concurrent
 request per server process and a maximum configured ceiling of 20,000 output
 tokens.
+
+### Project-scoped generation settings
+
+Preflight and generation requests may include these safe SQL-output choices:
+
+- SQL dialect.
+- Output format.
+- Source reference style.
+- dbt source name, when `dbt_source` is selected.
+
+The API validates compatibility before applying them to that request. It does
+not allow clients to override the provider, model, prompt limits, output-token
+limits, attempt count or retry policy. Those controls remain agent-owned in
+`config.yaml`, so the UI cannot weaken cost and safety limits.
 
 ## 6B. `agent/preflight.py`
 
@@ -856,7 +871,8 @@ runs generate the same OMOP table concurrently, the last promotion wins.
 ### `config.yaml`
 
 Controls provider, model, limits, source-reference style, output format and SQL
-dialect.
+dialect. HTTP clients may override only the safe SQL-output choices listed in
+the API section, and only for the current request.
 
 ### `.env`
 

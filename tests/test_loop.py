@@ -71,6 +71,10 @@ class RunAgentTest(unittest.TestCase):
         for field_mapping in mapping["fields"]:
             if field_mapping.get("review_required"):
                 field_mapping["review_status"] = "approved"
+                field_mapping.setdefault(
+                    "review_comment",
+                    "Approved loop test fixture review.",
+                )
         mapping_path.write_text(
             yaml.safe_dump(mapping, sort_keys=False),
             encoding="utf-8",
@@ -81,14 +85,29 @@ class RunAgentTest(unittest.TestCase):
         self.temporary_specs.cleanup()
 
     def _valid_person_sql(self) -> str:
-        target_schema_fields = validate_specs(
+        validated_specs = validate_specs(
             "person",
             self.specs_dir,
-        ).target_schema.fields
+        )
+        target_schema_fields = validated_specs.target_schema.fields
         target_fields = [field.name for field in target_schema_fields]
         target_types = {
             field.name: field.data_type for field in target_schema_fields
         }
+        race_source_mapping = next(
+            field
+            for field in validated_specs.mapping.fields
+            if field.target_field == "race_source_value"
+        )
+        race_source_columns = [
+            f"p.{source.field}"
+            for source in race_source_mapping.source_fields
+        ]
+        race_source_expression = (
+            f"CAST({race_source_columns[0]} AS VARCHAR(50))"
+            if len(race_source_columns) == 1
+            else f"CONCAT({', '.join(race_source_columns)})"
+        )
         mapped_expressions = {
             "person_id": "CAST(p.patient_id AS INTEGER)",
             "gender_concept_id": "g.gender_concept_id",
@@ -101,10 +120,7 @@ class RunAgentTest(unittest.TestCase):
             "gender_source_concept_id": (
                 "gs.gender_source_concept_id"
             ),
-            "race_source_value": (
-                "CONCAT(p.indigenous_status, '|', "
-                "p.country_of_birth)"
-            ),
+            "race_source_value": race_source_expression,
         }
         select_list = ",\n    ".join(
             (

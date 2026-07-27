@@ -17,9 +17,19 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         """Load known-good local specifications once for API tests."""
         project_root = Path(__file__).resolve().parents[1]
         specs_dir = project_root / "specs"
-        cls.mapping_content = (
+        mapping_content = (
             specs_dir / "mappings" / "person.yml"
         ).read_text(encoding="utf-8")
+        mapping = yaml.safe_load(mapping_content)
+        for field_mapping in mapping["fields"]:
+            if (
+                field_mapping.get("review_required")
+                and not field_mapping.get("review_comment")
+            ):
+                field_mapping["review_comment"] = (
+                    "Approved API test fixture review."
+                )
+        cls.mapping_content = yaml.safe_dump(mapping, sort_keys=False)
         cls.source_content = (
             specs_dir / "source_schema" / "cai_01_patient.yml"
         ).read_text(encoding="utf-8")
@@ -163,6 +173,50 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(result["initial_request_characters"], 0)
         self.assertIn("Pending mapping reviews", result["blockers"][0])
 
+    async def test_preflight_applies_safe_project_generation_settings(self):
+        self.payload["generation_settings"] = {
+            "sql_dialect": "postgres",
+            "output_format": "sql",
+            "source_reference_style": "relation",
+            "source_name": None,
+        }
+
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/preflight",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["sql_dialect"], "postgres")
+        self.assertEqual(result["output_format"], "sql")
+        self.assertEqual(result["source_reference_style"], "relation")
+
+    async def test_rejects_incompatible_project_generation_settings(self):
+        self.payload["generation_settings"] = {
+            "sql_dialect": "snowflake",
+            "output_format": "sql",
+            "source_reference_style": "dbt_ref",
+            "source_name": None,
+        }
+
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/preflight",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 422)
+
     async def test_generation_requires_the_current_confirmed_ceiling(self):
         self.approve_mapping_reviews()
         self.payload["confirmed_output_token_ceiling"] = 400
@@ -191,6 +245,12 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_generation_returns_only_validated_sql_and_usage(self):
         self.approve_mapping_reviews()
         self.payload["confirmed_output_token_ceiling"] = 1600
+        self.payload["generation_settings"] = {
+            "sql_dialect": "postgres",
+            "output_format": "sql",
+            "source_reference_style": "relation",
+            "source_name": None,
+        }
         generated_result = {
             "status": "done",
             "iterations": 1,
@@ -233,6 +293,10 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         run_agent.assert_called_once()
         self.assertFalse(
             run_agent.call_args.kwargs["promote_output"],
+        )
+        self.assertEqual(
+            run_agent.call_args.kwargs["config"]["output"]["dialect"],
+            "postgres",
         )
 
     async def test_generation_returns_bounded_validator_diagnostics(self):

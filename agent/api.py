@@ -2,7 +2,7 @@ import hmac
 import os
 from pathlib import Path
 from threading import BoundedSemaphore
-from typing import Annotated
+from typing import Annotated, Literal
 
 import yaml
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -126,10 +126,52 @@ class ValidationResponse(StrictApiModel):
     pending_reviews: list[str] = Field(default_factory=list)
 
 
+class ProjectGenerationSettings(StrictApiModel):
+    """Safe project choices layered over agent-owned configuration."""
+
+    sql_dialect: Literal["snowflake", "postgres", "athena", "bigquery"]
+    output_format: Literal["sql", "dbt"]
+    source_reference_style: Literal[
+        "relation",
+        "dbt_ref",
+        "dbt_source",
+    ]
+    source_name: Annotated[
+        str,
+        StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"),
+    ] | None = None
+
+    @model_validator(mode="after")
+    def validate_compatibility(self) -> "ProjectGenerationSettings":
+        if (
+            self.output_format == "sql"
+            and self.source_reference_style != "relation"
+        ):
+            raise ValueError(
+                "plain SQL output requires relation source references"
+            )
+        if (
+            self.source_reference_style == "dbt_source"
+            and self.source_name is None
+        ):
+            raise ValueError(
+                "dbt_source references require a source name"
+            )
+        if (
+            self.source_reference_style != "dbt_source"
+            and self.source_name is not None
+        ):
+            raise ValueError(
+                "source name is only allowed for dbt_source references"
+            )
+        return self
+
+
 class PreflightRequest(ValidationRequest):
     """Validated specifications plus bounded generation attempts."""
 
     max_iterations: int = Field(default=2, ge=1, le=2)
+    generation_settings: ProjectGenerationSettings | None = None
 
 
 class PreflightResponse(StrictApiModel):
@@ -188,7 +230,7 @@ class GenerationResponse(StrictApiModel):
 
 
 app = FastAPI(
-    title="Cardiac AI OMOP Agent API",
+    title="CardiacAI OMOP Agent API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url=None,
@@ -300,14 +342,38 @@ def _validate_request_specifications(
     )
 
 
-def _load_agent_config() -> dict:
-    """Load the same validated config.yaml used by the CLI."""
+def _load_agent_config(
+    generation_settings: ProjectGenerationSettings | None = None,
+) -> dict:
+    """Load agent defaults and apply only validated project choices."""
     try:
         raw_config = yaml.safe_load(
             CONFIG_PATH.read_text(encoding="utf-8")
         )
         if not isinstance(raw_config, dict):
             raise ValueError("config.yaml must contain a mapping")
+        if generation_settings is not None:
+            source_config = raw_config.get("source")
+            output_config = raw_config.get("output")
+            if not isinstance(source_config, dict) or not isinstance(
+                output_config,
+                dict,
+            ):
+                raise ValueError(
+                    "config.yaml must define source and output mappings"
+                )
+            source_config["reference_style"] = (
+                generation_settings.source_reference_style
+            )
+            source_config["source_name"] = (
+                generation_settings.source_name
+            )
+            output_config["format"] = (
+                generation_settings.output_format
+            )
+            output_config["dialect"] = (
+                generation_settings.sql_dialect
+            )
         return AgentConfig.model_validate(raw_config).model_dump()
     except (
         OSError,
@@ -378,7 +444,7 @@ def preflight(request: PreflightRequest) -> PreflightResponse:
         )
 
     try:
-        config = _load_agent_config()
+        config = _load_agent_config(request.generation_settings)
     except ValueError as error:
         return PreflightResponse(
             valid=False,
@@ -438,7 +504,7 @@ def generate(request: GenerationRequest) -> GenerationResponse:
     """Generate validated SQL after an exact cost-ceiling confirmation."""
     try:
         specs = _validate_request_specifications(request)
-        config = _load_agent_config()
+        config = _load_agent_config(request.generation_settings)
     except (SpecValidationError, ValueError) as error:
         return GenerationResponse(
             status="blocked",
