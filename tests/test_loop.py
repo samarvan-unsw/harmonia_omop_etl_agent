@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import yaml
 
-from agent.loop import run_agent
+from agent.loop import run_agent, run_agent_with_specs
 from agent.input_guard import InputSizeLimitError
 from agent.prompts import (
     SPEC_DATA_END,
@@ -79,6 +79,55 @@ class RunAgentTest(unittest.TestCase):
     def tearDown(self):
         """Remove temporary approved specifications."""
         self.temporary_specs.cleanup()
+
+    def _valid_person_sql(self) -> str:
+        target_schema_fields = validate_specs(
+            "person",
+            self.specs_dir,
+        ).target_schema.fields
+        target_fields = [field.name for field in target_schema_fields]
+        target_types = {
+            field.name: field.data_type for field in target_schema_fields
+        }
+        mapped_expressions = {
+            "person_id": "CAST(p.patient_id AS INTEGER)",
+            "gender_concept_id": "g.gender_concept_id",
+            "year_of_birth": "CAST(p.year_of_birth AS INTEGER)",
+            "race_concept_id": "r.race_concept_id",
+            "person_source_value": (
+                "CAST(p.patient_id AS VARCHAR(50))"
+            ),
+            "gender_source_value": "CAST(p.sex AS VARCHAR(50))",
+            "gender_source_concept_id": (
+                "gs.gender_source_concept_id"
+            ),
+            "race_source_value": (
+                "CONCAT(p.indigenous_status, '|', "
+                "p.country_of_birth)"
+            ),
+        }
+        select_list = ",\n    ".join(
+            (
+                f"{mapped_expressions[field_name]} AS {field_name}"
+                if field_name in mapped_expressions
+                else (
+                    f"CAST(NULL AS {target_types[field_name]}) "
+                    f"AS {field_name}"
+                )
+            )
+            for field_name in target_fields
+        )
+        return (
+            f"SELECT\n    {select_list}\n"
+            "FROM cai_01_patient AS p\n"
+            "LEFT JOIN mapping_person_gender_concept_id AS g\n"
+            "    ON p.sex = g.sex\n"
+            "LEFT JOIN mapping_person_race_concept_id AS r\n"
+            "    ON p.indigenous_status = r.indigenous_status\n"
+            "    AND p.country_of_birth = r.country_of_birth\n"
+            "LEFT JOIN mapping_person_gender_source_concept_id AS gs\n"
+            "    ON p.sex = gs.sex"
+        )
 
     def test_prompt_treats_specification_content_as_untrusted_data(self):
         """Specification comments must not be able to override agent rules."""
@@ -161,37 +210,7 @@ class RunAgentTest(unittest.TestCase):
             (self.project_root / "config.yaml").read_text(encoding="utf-8")
         )
 
-        target_schema_fields = validate_specs(
-            "person",
-            self.specs_dir,
-        ).target_schema.fields
-        target_fields = [field.name for field in target_schema_fields]
-        target_types = {
-            field.name: field.data_type for field in target_schema_fields
-        }
-        mapped_expressions = {
-            "person_id": "CAST(p.patient_id AS INTEGER)",
-            "gender_concept_id": "g.gender_concept_id",
-            "year_of_birth": "CAST(p.year_of_birth AS INTEGER)",
-            "race_concept_id": "r.race_concept_id",
-        }
-        select_list = ",\n    ".join(
-            (
-                f"{mapped_expressions[field_name]} AS {field_name}"
-                if field_name in mapped_expressions
-                else f"CAST(NULL AS {target_types[field_name]}) AS {field_name}"
-            )
-            for field_name in target_fields
-        )
-        sql = (
-            f"SELECT\n    {select_list}\n"
-            "FROM cai_01_patient AS p\n"
-            "LEFT JOIN mapping_person_gender_concept_id AS g\n"
-            "    ON p.sex = g.sex\n"
-            "LEFT JOIN mapping_person_race_concept_id AS r\n"
-            "    ON p.indigenous_status = r.indigenous_status\n"
-            "    AND p.country_of_birth = r.country_of_birth"
-        )
+        sql = self._valid_person_sql()
         provider = FakeProvider(sql)
 
         with tempfile.TemporaryDirectory() as temporary_output:
@@ -233,6 +252,36 @@ class RunAgentTest(unittest.TestCase):
                 130,
             )
 
+    def test_api_generation_returns_sql_without_promoting_output(self):
+        """HTTP generation must not overwrite the local CLI output."""
+        config = yaml.safe_load(
+            (self.project_root / "config.yaml").read_text(encoding="utf-8")
+        )
+        specs = validate_specs("person", self.specs_dir)
+        sql = self._valid_person_sql()
+
+        with tempfile.TemporaryDirectory() as temporary_output:
+            output_dir = Path(temporary_output).resolve()
+            with (
+                patch("agent.tools.OUTPUT_DIR", output_dir),
+                patch(
+                    "agent.loop.load_provider",
+                    return_value=FakeProvider(sql),
+                ),
+            ):
+                result = run_agent_with_specs(
+                    omop_table="person",
+                    specs=specs,
+                    config=config,
+                    max_iterations=2,
+                    promote_output=False,
+                )
+
+            self.assertEqual(result["status"], "done")
+            self.assertEqual(result["output_sql"], sql)
+            self.assertFalse((output_dir / "person.sql").exists())
+            self.assertEqual(list(output_dir.glob(".*.candidate")), [])
+
     def test_invalid_sql_preserves_existing_output(self):
         """A failed validation must not replace the last valid SQL file."""
         config = yaml.safe_load(
@@ -263,6 +312,11 @@ class RunAgentTest(unittest.TestCase):
             )
             self.assertEqual(result["status"], "invalid_output")
             self.assertFalse(result["output_valid"])
+            self.assertTrue(result["diagnostics"])
+            self.assertIn(
+                "missing target fields",
+                " ".join(result["diagnostics"]),
+            )
             self.assertEqual(
                 result["usage"]["successful_api_responses"],
                 2,

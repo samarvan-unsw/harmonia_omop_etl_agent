@@ -1,0 +1,567 @@
+import hmac
+import os
+from pathlib import Path
+from threading import BoundedSemaphore
+from typing import Annotated
+
+import yaml
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from openai import OpenAIError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+
+from .contracts import AgentConfig
+from .loop import run_agent_with_specs
+from .preflight import build_generation_preflight
+from .provider_errors import api_error_message
+from .validation import (
+    SpecValidationError,
+    ValidatedSpecs,
+    pending_review_fields,
+    validate_spec_contents,
+)
+
+ROOT = Path(__file__).resolve().parent.parent
+TARGET_SCHEMA_DIR = ROOT / "specs" / "target_schema"
+CONFIG_PATH = ROOT / "config.yaml"
+MAXIMUM_DOCUMENT_BYTES = 750 * 1024
+MAXIMUM_SPECIFICATION_BYTES = 2 * 1024 * 1024
+MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
+MINIMUM_API_TOKEN_LENGTH = 32
+MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
+GENERATION_SEMAPHORE = BoundedSemaphore(value=1)
+
+OmopTable = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^[a-z][a-z0-9_]*$",
+        max_length=63,
+    ),
+]
+YamlFileName = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*\.yml$",
+        max_length=255,
+    ),
+]
+
+
+class StrictApiModel(BaseModel):
+    """Reject unexpected API properties."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class YamlSpecification(StrictApiModel):
+    """One user-maintained YAML specification."""
+
+    file_name: YamlFileName
+    content: str = Field(min_length=1)
+
+    @field_validator("content")
+    @classmethod
+    def enforce_document_size(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > MAXIMUM_DOCUMENT_BYTES:
+            raise ValueError(
+                f"YAML content must not exceed {MAXIMUM_DOCUMENT_BYTES} bytes"
+            )
+        return value
+
+
+class ValidationRequest(StrictApiModel):
+    """Specifications required to validate one OMOP target table."""
+
+    omop_table: OmopTable
+    mapping: YamlSpecification
+    source_schemas: list[YamlSpecification] = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    @model_validator(mode="after")
+    def validate_request_files(self) -> "ValidationRequest":
+        expected_mapping = f"{self.omop_table}.yml"
+        if self.mapping.file_name != expected_mapping:
+            raise ValueError(
+                f"mapping filename must be '{expected_mapping}'"
+            )
+
+        file_names = [
+            specification.file_name
+            for specification in self.source_schemas
+        ]
+        if len(file_names) != len(set(file_names)):
+            raise ValueError("source schema filenames must be unique")
+
+        total_bytes = len(self.mapping.content.encode("utf-8")) + sum(
+            len(specification.content.encode("utf-8"))
+            for specification in self.source_schemas
+        )
+        if total_bytes > MAXIMUM_SPECIFICATION_BYTES:
+            raise ValueError(
+                "combined specification content exceeds the request limit"
+            )
+        return self
+
+
+class ValidationResponse(StrictApiModel):
+    """Stable response returned by the validation API."""
+
+    valid: bool
+    generation_ready: bool
+    omop_table: str
+    errors: list[str] = Field(default_factory=list)
+    source_models: list[str] = Field(default_factory=list)
+    target_field_count: int | None = None
+    pending_reviews: list[str] = Field(default_factory=list)
+
+
+class PreflightRequest(ValidationRequest):
+    """Validated specifications plus bounded generation attempts."""
+
+    max_iterations: int = Field(default=2, ge=1, le=2)
+
+
+class PreflightResponse(StrictApiModel):
+    """Deterministic generation settings and readiness."""
+
+    valid: bool
+    generation_ready: bool
+    omop_table: str
+    errors: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    pending_reviews: list[str] = Field(default_factory=list)
+    provider: str | None = None
+    model: str | None = None
+    sql_dialect: str | None = None
+    output_format: str | None = None
+    source_reference_style: str | None = None
+    maximum_output_tokens_per_request: int | None = None
+    automatic_api_retries: int | None = None
+    maximum_generation_attempts: int | None = None
+    worst_case_output_tokens: int | None = None
+    context_characters: int | None = None
+    initial_request_characters: int | None = None
+    maximum_initial_prompt_characters: int | None = None
+
+
+class GenerationRequest(PreflightRequest):
+    """Specifications plus an explicit current cost-ceiling confirmation."""
+
+    confirmed_output_token_ceiling: int = Field(gt=0)
+
+
+class GenerationUsage(StrictApiModel):
+    """Measured provider usage returned without transcript content."""
+
+    successful_api_responses: int = 0
+    input_tokens: int = 0
+    cached_input_tokens: int = 0
+    cache_write_input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_output_tokens: int = 0
+    total_tokens: int = 0
+
+
+class GenerationResponse(StrictApiModel):
+    """Bounded generation result for persistence by the calling UI."""
+
+    status: str
+    completed: bool
+    omop_table: str
+    errors: list[str] = Field(default_factory=list)
+    output_sql: str | None = None
+    iterations: int = 0
+    output_token_ceiling: int | None = None
+    model: str | None = None
+    usage: GenerationUsage = Field(default_factory=GenerationUsage)
+
+
+app = FastAPI(
+    title="Cardiac AI OMOP Agent API",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url=None,
+)
+
+
+@app.middleware("http")
+async def reject_oversized_requests(request: Request, call_next):
+    """Reject declared oversized bodies before JSON parsing."""
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAXIMUM_REQUEST_BYTES:
+                return JSONResponse(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    content={"detail": "Request body is too large."},
+                )
+        except ValueError:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"detail": "Invalid Content-Length header."},
+            )
+    return await call_next(request)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(
+    _request: Request,
+    error: RequestValidationError,
+):
+    """Return useful request errors without echoing submitted YAML."""
+    errors = []
+    for item in error.errors():
+        location = ".".join(str(part) for part in item["loc"])
+        errors.append(
+            {
+                "location": location,
+                "message": item["msg"],
+            }
+        )
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={
+            "valid": False,
+            "errors": errors,
+        },
+    )
+
+
+def require_api_token(
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    """Authenticate private server-to-server API calls."""
+    configured_token = os.getenv("AGENT_API_TOKEN")
+    if (
+        not configured_token
+        or len(configured_token) < MINIMUM_API_TOKEN_LENGTH
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="API authentication is not configured.",
+        )
+
+    scheme, separator, supplied_token = (authorization or "").partition(" ")
+    if (
+        not separator
+        or scheme.lower() != "bearer"
+        or not hmac.compare_digest(supplied_token, configured_token)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API credentials.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Expose a non-sensitive liveness endpoint."""
+    return {"service": "cardiac-ai-omop-agent", "status": "ok"}
+
+
+def _validate_request_specifications(
+    request: ValidationRequest,
+) -> ValidatedSpecs:
+    """Validate request YAML against the agent-owned target schema."""
+    target_schema_path = (
+        TARGET_SCHEMA_DIR / f"{request.omop_table}.yml"
+    )
+    try:
+        target_schema_content = target_schema_path.read_text(
+            encoding="utf-8"
+        )
+    except OSError as error:
+        raise SpecValidationError(
+            "The agent has no target schema for "
+            f"'{request.omop_table}'."
+        ) from error
+
+    source_contents = {
+        specification.file_name: specification.content
+        for specification in request.source_schemas
+    }
+    return validate_spec_contents(
+        request.omop_table,
+        request.mapping.content,
+        source_contents,
+        target_schema_content,
+    )
+
+
+def _load_agent_config() -> dict:
+    """Load the same validated config.yaml used by the CLI."""
+    try:
+        raw_config = yaml.safe_load(
+            CONFIG_PATH.read_text(encoding="utf-8")
+        )
+        if not isinstance(raw_config, dict):
+            raise ValueError("config.yaml must contain a mapping")
+        return AgentConfig.model_validate(raw_config).model_dump()
+    except (
+        OSError,
+        ValueError,
+        ValidationError,
+        yaml.YAMLError,
+    ) as error:
+        raise ValueError("Agent configuration is invalid.") from error
+
+
+def _bounded_generation_diagnostics(result: dict) -> list[str]:
+    """Return only bounded deterministic diagnostics from the local loop."""
+    diagnostics = result.get("diagnostics")
+    if not isinstance(diagnostics, list):
+        return ["The agent did not produce valid SQL."]
+
+    bounded = [
+        item[:500]
+        for item in diagnostics
+        if isinstance(item, str) and item.strip()
+    ][:20]
+    return bounded or ["The agent did not produce valid SQL."]
+
+
+@app.post(
+    "/v1/validate",
+    response_model=ValidationResponse,
+    dependencies=[Depends(require_api_token)],
+)
+def validate(request: ValidationRequest) -> ValidationResponse:
+    """Validate specifications without calling an AI provider."""
+    try:
+        specs = _validate_request_specifications(request)
+    except SpecValidationError as error:
+        return ValidationResponse(
+            valid=False,
+            generation_ready=False,
+            omop_table=request.omop_table,
+            errors=[str(error)],
+        )
+
+    pending_reviews = list(pending_review_fields(specs))
+    return ValidationResponse(
+        valid=True,
+        generation_ready=not pending_reviews,
+        omop_table=request.omop_table,
+        source_models=sorted(specs.source_models),
+        target_field_count=len(specs.target_schema.fields),
+        pending_reviews=pending_reviews,
+    )
+
+
+@app.post(
+    "/v1/preflight",
+    response_model=PreflightResponse,
+    dependencies=[Depends(require_api_token)],
+)
+def preflight(request: PreflightRequest) -> PreflightResponse:
+    """Return generation readiness without creating an AI provider."""
+    try:
+        specs = _validate_request_specifications(request)
+    except SpecValidationError as error:
+        return PreflightResponse(
+            valid=False,
+            generation_ready=False,
+            omop_table=request.omop_table,
+            errors=[str(error)],
+        )
+
+    try:
+        config = _load_agent_config()
+    except ValueError as error:
+        return PreflightResponse(
+            valid=False,
+            generation_ready=False,
+            omop_table=request.omop_table,
+            errors=[str(error)],
+        )
+
+    result = build_generation_preflight(
+        request.omop_table,
+        specs,
+        config,
+        request.max_iterations,
+    )
+    blockers = []
+    if result.pending_reviews:
+        blockers.append(
+            "Pending mapping reviews: "
+            + ", ".join(result.pending_reviews)
+        )
+    if result.input_limit_exceeded:
+        blockers.append(
+            "Initial request exceeds the configured character limit."
+        )
+
+    return PreflightResponse(
+        valid=True,
+        generation_ready=result.generation_ready,
+        omop_table=request.omop_table,
+        blockers=blockers,
+        pending_reviews=list(result.pending_reviews),
+        provider=config["provider"],
+        model=config["model"],
+        sql_dialect=config["output"]["dialect"],
+        output_format=config["output"]["format"],
+        source_reference_style=config["source"]["reference_style"],
+        maximum_output_tokens_per_request=config["max_output_tokens"],
+        automatic_api_retries=config["max_api_retries"],
+        maximum_generation_attempts=request.max_iterations,
+        worst_case_output_tokens=result.output_token_ceiling,
+        context_characters=result.context_characters,
+        initial_request_characters=(
+            result.initial_request_characters
+        ),
+        maximum_initial_prompt_characters=(
+            result.maximum_initial_prompt_characters
+        ),
+    )
+
+
+@app.post(
+    "/v1/generate",
+    response_model=GenerationResponse,
+    dependencies=[Depends(require_api_token)],
+)
+def generate(request: GenerationRequest) -> GenerationResponse:
+    """Generate validated SQL after an exact cost-ceiling confirmation."""
+    try:
+        specs = _validate_request_specifications(request)
+        config = _load_agent_config()
+    except (SpecValidationError, ValueError) as error:
+        return GenerationResponse(
+            status="blocked",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=[str(error)],
+        )
+
+    preflight_result = build_generation_preflight(
+        request.omop_table,
+        specs,
+        config,
+        request.max_iterations,
+    )
+    if not preflight_result.generation_ready:
+        blockers = []
+        if preflight_result.pending_reviews:
+            blockers.append(
+                "Pending mapping reviews: "
+                + ", ".join(preflight_result.pending_reviews)
+            )
+        if preflight_result.input_limit_exceeded:
+            blockers.append(
+                "Initial request exceeds the configured character limit."
+            )
+        return GenerationResponse(
+            status="blocked",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=blockers,
+            output_token_ceiling=preflight_result.output_token_ceiling,
+            model=config["model"],
+        )
+
+    current_ceiling = preflight_result.output_token_ceiling
+    if request.confirmed_output_token_ceiling != current_ceiling:
+        return GenerationResponse(
+            status="blocked",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=[
+                "The confirmed output-token ceiling no longer matches "
+                f"the current ceiling of {current_ceiling}. "
+                "Run preflight again."
+            ],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+        )
+    if current_ceiling > MAXIMUM_API_RUN_OUTPUT_TOKENS:
+        return GenerationResponse(
+            status="blocked",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=[
+                "The configured output-token ceiling exceeds the "
+                f"HTTP API limit of {MAXIMUM_API_RUN_OUTPUT_TOKENS}."
+            ],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+        )
+
+    if not GENERATION_SEMAPHORE.acquire(blocking=False):
+        return GenerationResponse(
+            status="busy",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=["Another generation request is already running."],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+        )
+
+    try:
+        result = run_agent_with_specs(
+            omop_table=request.omop_table,
+            specs=specs,
+            config=config,
+            max_iterations=request.max_iterations,
+            promote_output=False,
+        )
+    except KeyError:
+        return GenerationResponse(
+            status="failed",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=["OpenAI authentication is not configured."],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+        )
+    except OpenAIError as error:
+        return GenerationResponse(
+            status="failed",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=[api_error_message(error)],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+        )
+    except (OSError, ValueError):
+        return GenerationResponse(
+            status="failed",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=["The agent could not process the generated output."],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+        )
+    finally:
+        GENERATION_SEMAPHORE.release()
+
+    usage = GenerationUsage.model_validate(result.get("usage", {}))
+    completed = result.get("status") == "done"
+    return GenerationResponse(
+        status=result.get("status", "failed"),
+        completed=completed,
+        omop_table=request.omop_table,
+        errors=(
+            []
+            if completed
+            else _bounded_generation_diagnostics(result)
+        ),
+        output_sql=result.get("output_sql") if completed else None,
+        iterations=result.get("iterations", 0),
+        output_token_ceiling=current_ceiling,
+        model=config["model"],
+        usage=usage,
+    )

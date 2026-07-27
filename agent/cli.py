@@ -9,23 +9,17 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 from openai import (
-    APIConnectionError,
-    APIStatusError,
-    APITimeoutError,
-    AuthenticationError,
-    BadRequestError,
     OpenAIError,
-    PermissionDeniedError,
-    RateLimitError,
 )
 from pydantic import ValidationError
 
-from .context import build_context
 from .contracts import AgentConfig
-from .input_guard import initial_request_character_count
 from .loop import run_agent
-from .prompts import build_system_prompt, build_user_prompt
-from .tools import TOOL_SCHEMAS
+from .preflight import (
+    build_generation_preflight,
+    configured_output_token_ceiling,
+)
+from .provider_errors import api_error_message
 from .validation import (
     SpecValidationError,
     pending_review_fields,
@@ -36,24 +30,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _api_error_message(error: OpenAIError) -> str:
-    """Return a concise API failure message without echoing request details."""
-    if isinstance(error, AuthenticationError):
-        return "OpenAI authentication failed; check OPENAI_API_KEY."
-    if isinstance(error, PermissionDeniedError):
-        return "OpenAI denied access to the configured project or model."
-    if isinstance(error, RateLimitError):
-        if getattr(error, "code", None) == "insufficient_quota":
-            return "OpenAI API quota is unavailable; check project billing or credits."
-        return "OpenAI API rate limit reached; retry later."
-    if isinstance(error, APITimeoutError):
-        return "OpenAI API request timed out."
-    if isinstance(error, APIConnectionError):
-        return "Could not connect to the OpenAI API."
-    if isinstance(error, BadRequestError):
-        return "OpenAI rejected the request; check the model and request configuration."
-    if isinstance(error, APIStatusError):
-        return f"OpenAI API returned HTTP {error.status_code}."
-    return "OpenAI API request failed."
+    """Backward-compatible wrapper around shared safe error formatting."""
+    return api_error_message(error)
 
 
 def _json_default(obj):
@@ -71,13 +49,8 @@ def _positive_int(value: str) -> int:
 
 
 def _configured_output_token_ceiling(config: dict, max_iterations: int) -> int:
-    """Calculate the conservative generated-token ceiling for one CLI run."""
-    attempts_per_iteration = config["max_api_retries"] + 1
-    return (
-        config["max_output_tokens"]
-        * max_iterations
-        * attempts_per_iteration
-    )
+    """Backward-compatible wrapper for the shared preflight calculation."""
+    return configured_output_token_ceiling(config, max_iterations)
 
 
 def _format_usage(usage: dict) -> str:
@@ -194,22 +167,22 @@ def main():
 
     try:
         specs = validate_specs(args.omop_table, specs_dir)
-        context = build_context(args.omop_table, specs_dir)
     except SpecValidationError as exc:
         parser.error(str(exc))
+    preflight = build_generation_preflight(
+        args.omop_table,
+        specs,
+        config,
+        args.max_iterations,
+    )
+    # Keep the CLI review-gate seam stable for existing integrations/tests.
     pending_reviews = pending_review_fields(specs)
     output_filename = f"{args.omop_table}.sql"
-    system_prompt = build_system_prompt(args.omop_table, config)
-    user_prompt = build_user_prompt(context, output_filename)
-    initial_request_characters = initial_request_character_count(
-        system_prompt,
-        user_prompt,
-        TOOL_SCHEMAS,
+    initial_request_characters = preflight.initial_request_characters
+    maximum_prompt_characters = (
+        preflight.maximum_initial_prompt_characters
     )
-    maximum_prompt_characters = config["max_initial_prompt_characters"]
-    input_limit_exceeded = (
-        initial_request_characters > maximum_prompt_characters
-    )
+    input_limit_exceeded = preflight.input_limit_exceeded
 
     if args.dry_run:
         output_path = ROOT / "output" / output_filename
@@ -224,7 +197,9 @@ def main():
         print(f"Output format: {config['output']['format']}")
         print(f"Source reference style: {config['source']['reference_style']}")
         print(f"Target file: {output_path}")
-        print(f"Context size: {len(context)} characters")
+        print(
+            f"Context size: {preflight.context_characters} characters"
+        )
         print(
             "Initial request size: "
             f"{initial_request_characters} / "
@@ -251,7 +226,8 @@ def main():
             f"Validation passed for '{args.omop_table}': "
             f"{len(specs.source_models)} source model(s), "
             f"{len(specs.target_schema.fields)} target field(s), "
-            f"{len(context)} context characters. No API call was made."
+            f"{preflight.context_characters} context characters. "
+            "No API call was made."
         )
         if pending_reviews:
             message += " Pending reviews: " + ", ".join(pending_reviews) + "."

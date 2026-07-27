@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from .contracts import FieldMapping, SourceModel, TargetField
-from .validation import validate_specs
+from .validation import ValidatedSpecs, validate_specs
 
 
 def _format_source_model(model: SourceModel) -> list[str]:
@@ -83,9 +83,8 @@ def _format_target_field(
     return lines
 
 
-def build_context(omop_table: str, specs_dir: Path) -> str:
-    """Build compact prompt context from validated specification files."""
-    specs = validate_specs(omop_table, specs_dir)
+def build_context_from_specs(specs: ValidatedSpecs) -> str:
+    """Build compact prompt context from already validated specifications."""
     lines = ["# Validated source models"]
 
     for model_name in specs.mapping.source_models:
@@ -122,3 +121,10 @@ def build_context(omop_table: str, specs_dir: Path) -> str:
         )
 
     return "\n".join(lines)
+
+
+def build_context(omop_table: str, specs_dir: Path) -> str:
+    """Build compact prompt context from local specification files."""
+    return build_context_from_specs(
+        validate_specs(omop_table, specs_dir)
+    )

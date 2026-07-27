@@ -50,13 +50,45 @@ def _load_yaml(path: Path) -> Any:
         raise SpecValidationError(f"Invalid YAML in {path}: {exc}") from exc
 
 
-def _load_mapping(omop_table: str, specs_dir: Path) -> MappingDocument:
-    """Load and validate one OMOP mapping document."""
-    path = specs_dir / "mappings" / f"{omop_table}.yml"
+def _load_yaml_text(content: str, label: str) -> Any:
+    """Parse one in-memory YAML document for API-backed validation."""
     try:
-        mapping = MappingDocument.model_validate(_load_yaml(path))
+        return yaml.safe_load(content)
+    except (RecursionError, yaml.YAMLError) as exc:
+        raise SpecValidationError(f"Invalid YAML in {label}: {exc}") from exc
+
+
+def _format_contract_error(
+    contract_name: str,
+    label: str,
+    error: ValidationError,
+) -> SpecValidationError:
+    """Format contract errors without echoing submitted specification values."""
+    details = []
+    for item in error.errors(
+        include_input=False,
+        include_url=False,
+    ):
+        location = ".".join(str(part) for part in item["loc"])
+        prefix = f"{location}: " if location else ""
+        details.append(prefix + item["msg"])
+
+    return SpecValidationError(
+        f"Invalid {contract_name} contract in {label}:\n"
+        + "\n".join(details)
+    )
+
+
+def _validate_mapping_document(
+    omop_table: str,
+    document: Any,
+    label: str,
+) -> MappingDocument:
+    """Validate one parsed mapping document and its target-table identity."""
+    try:
+        mapping = MappingDocument.model_validate(document)
     except ValidationError as exc:
-        raise SpecValidationError(f"Invalid mapping contract in {path}:\n{exc}") from exc
+        raise _format_contract_error("mapping", label, exc) from exc
 
     if mapping.target_table != omop_table:
         raise SpecValidationError(
@@ -66,35 +98,45 @@ def _load_mapping(omop_table: str, specs_dir: Path) -> MappingDocument:
     return mapping
 
 
-def _load_source_model(model_name: str, specs_dir: Path) -> SourceModel:
-    """Load one source model using the one-file-per-model convention."""
-    path = specs_dir / "source_schema" / f"{model_name}.yml"
+def _validate_source_document(
+    model_name: str,
+    document: Any,
+    label: str,
+) -> SourceModel:
+    """Validate one parsed source-schema document and select its model."""
     try:
-        document = SourceSchemaDocument.model_validate(_load_yaml(path))
+        source_schema = SourceSchemaDocument.model_validate(document)
     except ValidationError as exc:
-        raise SpecValidationError(
-            f"Invalid source-schema contract in {path}:\n{exc}"
+        raise _format_contract_error(
+            "source-schema",
+            label,
+            exc,
         ) from exc
 
-    matches = [model for model in document.models if model.name == model_name]
+    matches = [
+        model for model in source_schema.models
+        if model.name == model_name
+    ]
     if len(matches) != 1:
         raise SpecValidationError(
-            f"{path} must contain exactly one model named '{model_name}'"
+            f"{label} must contain exactly one model named '{model_name}'"
         )
     return matches[0]
 
 
-def _load_target_schema(
+def _validate_target_document(
     omop_table: str,
-    specs_dir: Path,
+    document: Any,
+    label: str,
 ) -> TargetSchemaDocument:
-    """Load and validate one OMOP target-schema document."""
-    path = specs_dir / "target_schema" / f"{omop_table}.yml"
+    """Validate one parsed OMOP target-schema document."""
     try:
-        target_schema = TargetSchemaDocument.model_validate(_load_yaml(path))
+        target_schema = TargetSchemaDocument.model_validate(document)
     except ValidationError as exc:
-        raise SpecValidationError(
-            f"Invalid target-schema contract in {path}:\n{exc}"
+        raise _format_contract_error(
+            "target-schema",
+            label,
+            exc,
         ) from exc
 
     if target_schema.target_table != omop_table:
@@ -105,20 +147,53 @@ def _load_target_schema(
     return target_schema
 
 
-def validate_specs(omop_table: str, specs_dir: Path) -> ValidatedSpecs:
-    """Validate a mapping and all source model/field references it uses."""
+def _load_mapping(omop_table: str, specs_dir: Path) -> MappingDocument:
+    """Load and validate one OMOP mapping document."""
+    path = specs_dir / "mappings" / f"{omop_table}.yml"
+    return _validate_mapping_document(
+        omop_table,
+        _load_yaml(path),
+        str(path),
+    )
+
+
+def _load_source_model(model_name: str, specs_dir: Path) -> SourceModel:
+    """Load one source model using the one-file-per-model convention."""
+    path = specs_dir / "source_schema" / f"{model_name}.yml"
+    return _validate_source_document(
+        model_name,
+        _load_yaml(path),
+        str(path),
+    )
+
+
+def _load_target_schema(
+    omop_table: str,
+    specs_dir: Path,
+) -> TargetSchemaDocument:
+    """Load and validate one OMOP target-schema document."""
+    path = specs_dir / "target_schema" / f"{omop_table}.yml"
+    return _validate_target_document(
+        omop_table,
+        _load_yaml(path),
+        str(path),
+    )
+
+
+def _validate_omop_table(omop_table: str) -> None:
+    """Reject target-table values that are unsafe as file identifiers."""
     if not OMOP_TABLE_PATTERN.fullmatch(omop_table):
         raise SpecValidationError(
             "OMOP table must use lowercase letters, numbers and underscores"
         )
 
-    mapping = _load_mapping(omop_table, specs_dir)
-    target_schema = _load_target_schema(omop_table, specs_dir)
-    source_models = {
-        model_name: _load_source_model(model_name, specs_dir)
-        for model_name in mapping.source_models
-    }
 
+def _validate_references(
+    mapping: MappingDocument,
+    source_models: dict[str, SourceModel],
+    target_schema: TargetSchemaDocument,
+) -> ValidatedSpecs:
+    """Validate cross-file source fields and OMOP target coverage."""
     available_fields = {
         model_name: {column.name for column in model.columns}
         for model_name, model in source_models.items()
@@ -175,4 +250,63 @@ def validate_specs(omop_table: str, specs_dir: Path) -> ValidatedSpecs:
         mapping=mapping,
         source_models=source_models,
         target_schema=target_schema,
+    )
+
+
+def validate_spec_contents(
+    omop_table: str,
+    mapping_content: str,
+    source_contents: dict[str, str],
+    target_schema_content: str,
+) -> ValidatedSpecs:
+    """Validate in-memory API inputs using the authoritative agent contracts."""
+    _validate_omop_table(omop_table)
+    mapping_label = f"mappings/{omop_table}.yml"
+    mapping = _validate_mapping_document(
+        omop_table,
+        _load_yaml_text(mapping_content, mapping_label),
+        mapping_label,
+    )
+    target_label = f"target_schema/{omop_table}.yml"
+    target_schema = _validate_target_document(
+        omop_table,
+        _load_yaml_text(target_schema_content, target_label),
+        target_label,
+    )
+    source_models = {}
+
+    for model_name in mapping.source_models:
+        file_name = f"{model_name}.yml"
+        label = f"source_schema/{file_name}"
+        content = source_contents.get(file_name)
+        if content is None:
+            raise SpecValidationError(
+                f"Specification file not found: {label}"
+            )
+        source_models[model_name] = _validate_source_document(
+            model_name,
+            _load_yaml_text(content, label),
+            label,
+        )
+
+    return _validate_references(
+        mapping,
+        source_models,
+        target_schema,
+    )
+
+
+def validate_specs(omop_table: str, specs_dir: Path) -> ValidatedSpecs:
+    """Validate local specification files for CLI and VS Code workflows."""
+    _validate_omop_table(omop_table)
+    mapping = _load_mapping(omop_table, specs_dir)
+    target_schema = _load_target_schema(omop_table, specs_dir)
+    source_models = {
+        model_name: _load_source_model(model_name, specs_dir)
+        for model_name in mapping.source_models
+    }
+    return _validate_references(
+        mapping,
+        source_models,
+        target_schema,
     )

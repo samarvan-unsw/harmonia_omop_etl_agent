@@ -1,0 +1,50 @@
+import unittest
+from pathlib import Path
+
+import yaml
+
+from agent.contracts import AgentConfig
+from agent.preflight import (
+    build_generation_preflight,
+    configured_output_token_ceiling,
+)
+from agent.validation import validate_specs
+
+
+class GenerationPreflightTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        project_root = Path(__file__).resolve().parents[1]
+        cls.specs = validate_specs("person", project_root / "specs")
+        raw_config = yaml.safe_load(
+            (project_root / "config.yaml").read_text(encoding="utf-8")
+        )
+        cls.config = AgentConfig.model_validate(raw_config).model_dump()
+
+    def test_calculates_the_same_bounded_request_information_as_cli(self):
+        result = build_generation_preflight(
+            "person",
+            self.specs,
+            self.config,
+            max_iterations=2,
+        )
+
+        self.assertGreater(result.context_characters, 0)
+        self.assertGreater(result.initial_request_characters, 0)
+        self.assertEqual(result.output_token_ceiling, 1600)
+        self.assertIn("race_concept_id", result.pending_reviews)
+        self.assertFalse(result.generation_ready)
+
+    def test_rejects_non_positive_generation_attempts(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "max_iterations must be greater than zero",
+        ):
+            configured_output_token_ceiling(
+                self.config,
+                max_iterations=0,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

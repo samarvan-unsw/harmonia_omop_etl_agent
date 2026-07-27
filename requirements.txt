@@ -3,3 +3,5 @@ PyYAML==6.0.3
 python-dotenv==1.2.2
 pydantic==2.13.4
 sqlglot==30.13.0
+fastapi==0.139.2
+uvicorn==0.51.0

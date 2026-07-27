@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 from typing import Any, Callable
@@ -5,7 +6,30 @@ from typing import Any, Callable
 
 # Generated SQL files are written directly into this directory.
 ROOT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = (ROOT_DIR / "output").resolve()
+
+
+def _configured_output_dir() -> Path:
+    """Use local output by default and a safe absolute scratch override."""
+    configured = os.getenv("AGENT_OUTPUT_DIR")
+    if not configured:
+        return (ROOT_DIR / "output").resolve()
+
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        raise ValueError("AGENT_OUTPUT_DIR must be an absolute path")
+
+    resolved = candidate.resolve()
+    forbidden = {
+        Path("/").resolve(),
+        Path.home().resolve(),
+        ROOT_DIR.resolve(),
+    }
+    if resolved in forbidden:
+        raise ValueError("AGENT_OUTPUT_DIR is too broad")
+    return resolved
+
+
+OUTPUT_DIR = _configured_output_dir()
 
 # Only simple top-level SQL filenames are allowed.
 SQL_FILENAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.sql$")

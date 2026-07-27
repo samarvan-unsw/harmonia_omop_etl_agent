@@ -2,7 +2,7 @@ from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
-from .context import build_context
+from .context import build_context_from_specs
 from .input_guard import enforce_initial_request_limit
 from .prompts import build_system_prompt, build_user_prompt
 from .providers import load_provider
@@ -17,6 +17,7 @@ from .tools import (
 )
 from .validation import (
     SpecValidationError,
+    ValidatedSpecs,
     pending_review_fields,
     validate_specs,
 )
@@ -28,11 +29,28 @@ def run_agent(
     config: dict,
     max_iterations: int = 6,
 ) -> dict:
-    """Generate one OMOP SQL file through a bounded tool-calling loop."""
+    """Generate and promote one OMOP SQL file from local specifications."""
+    specs = validate_specs(omop_table, specs_dir)
+    return run_agent_with_specs(
+        omop_table=omop_table,
+        specs=specs,
+        config=config,
+        max_iterations=max_iterations,
+        promote_output=True,
+    )
+
+
+def run_agent_with_specs(
+    omop_table: str,
+    specs: ValidatedSpecs,
+    config: dict,
+    max_iterations: int = 6,
+    promote_output: bool = False,
+) -> dict:
+    """Generate SQL from validated specs, optionally promoting it locally."""
     if max_iterations < 1:
         raise ValueError("max_iterations must be greater than zero")
 
-    specs = validate_specs(omop_table, specs_dir)
     pending_reviews = pending_review_fields(specs)
     if pending_reviews:
         raise SpecValidationError(
@@ -40,7 +58,7 @@ def run_agent(
             + ", ".join(pending_reviews)
         )
 
-    context = build_context(omop_table, specs_dir)
+    context = build_context_from_specs(specs)
     system_prompt = build_system_prompt(omop_table, config)
     output_filename = f"{omop_table}.sql"
     user_prompt = build_user_prompt(context, output_filename)
@@ -61,6 +79,7 @@ def run_agent(
     total_usage = TokenUsage()
     successful_api_responses = 0
     expected_fields = [field.name for field in specs.target_schema.fields]
+    last_validation_errors: tuple[str, ...] = ()
 
     messages = [
         {
@@ -85,9 +104,15 @@ def run_agent(
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
                 status = "invalid_output" if output_written else "no_output_written"
+                diagnostics = list(last_validation_errors)
+                if not diagnostics:
+                    diagnostics.append(
+                        "Model did not write the required SQL file."
+                    )
                 return {
                     "status": status,
                     "message": response.text,
+                    "diagnostics": diagnostics,
                     "iterations": iteration,
                     "output_written": output_written,
                     "output_valid": output_valid,
@@ -131,18 +156,25 @@ def run_agent(
                     tool_result = (
                         f"{tool_result}\n{validation.as_tool_message()}"
                     )
+                    last_validation_errors = validation.errors
 
                     if validation.valid:
-                        promote_file(
+                        generated_sql = read_file(
                             output_filename,
                             candidate_id=candidate_id,
                         )
+                        if promote_output:
+                            promote_file(
+                                output_filename,
+                                candidate_id=candidate_id,
+                            )
+                            output_promoted = True
                         output_valid = True
-                        output_promoted = True
-                        tool_result = (
-                            f"{tool_result}\nPromoted validated SQL to "
-                            f"{output_filename}."
-                        )
+                        if promote_output:
+                            tool_result = (
+                                f"{tool_result}\nPromoted validated SQL to "
+                                f"{output_filename}."
+                            )
 
                 messages.append(
                     {
@@ -155,21 +187,29 @@ def run_agent(
                 # Local validation is the terminal success condition. Avoid
                 # another API request solely to obtain an assistant summary.
                 if output_valid:
-                    return {
+                    result = {
                         "status": "done",
                         "message": f"Generated and validated {output_filename}.",
                         "iterations": iteration,
                         "output_written": True,
                         "output_valid": True,
+                        "diagnostics": [],
                         "usage": {
                             "successful_api_responses": successful_api_responses,
                             **asdict(total_usage),
                         },
                         "transcript": messages,
                     }
+                    if not promote_output:
+                        result["output_sql"] = generated_sql
+                    return result
 
         return {
             "status": "max_iterations_reached",
+            "diagnostics": (
+                list(last_validation_errors)
+                or ["Maximum attempts reached without valid SQL."]
+            ),
             "iterations": max_iterations,
             "output_written": output_written,
             "output_valid": output_valid,

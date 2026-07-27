@@ -126,12 +126,66 @@ Run the local test suite:
 python -m unittest discover -s tests -v
 ```
 
+## Optional validation API
+
+The HTTP API is a separate entry point over the same authoritative validator
+and preflight logic. It does not change the existing CLI or VS Code workflow.
+It validates supplied source schemas and mappings against agent-owned target
+schemas without calling OpenAI.
+
+Generate a private server token and add it to `.env`:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+```text
+AGENT_API_TOKEN=replace_with_the_generated_value
+```
+
+Start the local API:
+
+```bash
+uvicorn agent.api:app --reload --env-file .env
+```
+
+Check its health:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Interactive request documentation is available at
+`http://127.0.0.1:8000/docs`. Calls to `POST /v1/validate`,
+`POST /v1/preflight` and `POST /v1/generate` require
+`Authorization: Bearer <AGENT_API_TOKEN>`.
+Preflight reports generation readiness, prompt size, configured SQL settings
+and the worst-case output-token ceiling without creating an OpenAI client.
+Generation requires the caller to confirm that exact current ceiling. The API
+returns only locally validated SQL and measured usage; it does not overwrite
+the CLI-managed file in `output/`. Only one API generation runs concurrently
+within a server process. Failed runs return bounded deterministic SQL-validator
+messages, never prompts or provider transcripts.
+
+## Optional Vercel deployment
+
+`Dockerfile.vercel` packages the HTTP API as a stateless Vercel container
+without changing the local CLI. It includes agent code, target schemas,
+`config.yaml` and pinned dependencies only. Hosted candidate files use
+application-specific `/tmp` scratch space; validated SQL remains in Supabase.
+
+See [docs/vercel_deployment.md](docs/vercel_deployment.md) for the GitHub,
+secret and UI connection steps.
+
 ## Main components
 
 | Path | Purpose |
 | --- | --- |
 | `agent/contracts.py` | Strict configuration and specification contracts |
 | `agent/validation.py` | Cross-file source, mapping and target validation |
+| `agent/api.py` | Optional authenticated HTTP interface to validation and preflight |
+| `agent/preflight.py` | Shared local readiness and cost-ceiling calculation |
+| `agent/provider_errors.py` | Safe provider-error messages for CLI and HTTP |
 | `agent/context.py` | Compact validated prompt context |
 | `agent/prompts.py` | Fixed prompt rules and untrusted-data boundaries |
 | `agent/input_guard.py` | Local initial-request size enforcement |
@@ -140,6 +194,8 @@ python -m unittest discover -s tests -v
 | `agent/sql_validation.py` | Deterministic static SQL validation |
 | `agent/loop.py` | Bounded generate, write, validate and revise loop |
 | `agent/cli.py` | Safe-by-default command-line entry point |
+| `Dockerfile.vercel` | Reproducible non-root Vercel API container |
+| `.dockerignore` | Excludes local secrets, inputs, outputs and development files |
 | `logs/` | Secure transcripts with measured per-run token usage |
 | `output/` | Final generated SQL files |
 

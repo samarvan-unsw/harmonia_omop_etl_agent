@@ -82,6 +82,20 @@ class MappingRuleValidationTest(unittest.TestCase):
 
     def test_required_field_explicitly_mapped_to_null_is_allowed(self):
         """A deliberate null action should count as a required-field mapping."""
+        mapping_path = self.specs_dir / "mappings" / "person.yml"
+        mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        ethnicity_mapping = next(
+            field
+            for field in mapping["fields"]
+            if field["target_field"] == "ethnicity_concept_id"
+        )
+        ethnicity_mapping["action"] = "null"
+        ethnicity_mapping["transformation"] = "Deliberately set to null."
+        mapping_path.write_text(
+            yaml.safe_dump(mapping, sort_keys=False),
+            encoding="utf-8",
+        )
+
         result = validate_specs("person", self.specs_dir)
         ethnicity_mapping = next(
             field
@@ -95,6 +109,9 @@ class MappingRuleValidationTest(unittest.TestCase):
         """Structurally valid pending reviews should remain visible."""
         mapping_path = self.specs_dir / "mappings" / "person.yml"
         mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        for field in mapping["fields"]:
+            if field.get("review_required"):
+                field["review_status"] = "approved"
         race_mapping = next(
             field
             for field in mapping["fields"]

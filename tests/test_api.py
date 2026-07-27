@@ -1,0 +1,304 @@
+import os
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import yaml
+from httpx import ASGITransport, AsyncClient
+
+from agent.api import app
+
+
+class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
+    API_TOKEN = "test-agent-api-token-that-is-at-least-32-characters"
+
+    @classmethod
+    def setUpClass(cls):
+        """Load known-good local specifications once for API tests."""
+        project_root = Path(__file__).resolve().parents[1]
+        specs_dir = project_root / "specs"
+        cls.mapping_content = (
+            specs_dir / "mappings" / "person.yml"
+        ).read_text(encoding="utf-8")
+        cls.source_content = (
+            specs_dir / "source_schema" / "cai_01_patient.yml"
+        ).read_text(encoding="utf-8")
+
+    async def asyncSetUp(self):
+        self.client = AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        )
+        self.payload = {
+            "omop_table": "person",
+            "mapping": {
+                "file_name": "person.yml",
+                "content": self.mapping_content,
+            },
+            "source_schemas": [
+                {
+                    "file_name": "cai_01_patient.yml",
+                    "content": self.source_content,
+                }
+            ],
+        }
+        self.headers = {
+            "Authorization": f"Bearer {self.API_TOKEN}",
+        }
+
+    async def asyncTearDown(self):
+        await self.client.aclose()
+
+    def approve_mapping_reviews(self):
+        """Make the request eligible for generation without changing files."""
+        mapping = yaml.safe_load(self.mapping_content)
+        for field_mapping in mapping["fields"]:
+            if field_mapping.get("review_required"):
+                field_mapping["review_status"] = "approved"
+        self.payload["mapping"]["content"] = yaml.safe_dump(
+            mapping,
+            sort_keys=False,
+        )
+
+    async def test_health_does_not_require_authentication(self):
+        response = await self.client.get("/health")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ok")
+
+    async def test_validation_requires_bearer_token(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/validate",
+                json=self.payload,
+            )
+
+        self.assertEqual(response.status_code, 401)
+
+    async def test_validation_refuses_unconfigured_authentication(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AGENT_API_TOKEN", None)
+            response = await self.client.post(
+                "/v1/validate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 503)
+
+    async def test_validates_without_calling_openai(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/validate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["omop_table"], "person")
+        self.assertEqual(result["source_models"], ["cai_01_patient"])
+        self.assertEqual(result["target_field_count"], 18)
+        self.assertFalse(result["generation_ready"])
+        self.assertIn("race_concept_id", result["pending_reviews"])
+
+    async def test_reports_cross_file_validation_failure(self):
+        mapping = yaml.safe_load(self.mapping_content)
+        mapping["fields"][0]["source_fields"][0]["field"] = "unknown_field"
+        self.payload["mapping"]["content"] = yaml.safe_dump(
+            mapping,
+            sort_keys=False,
+        )
+
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/validate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result["valid"])
+        self.assertIn(
+            "Mapping references unknown source fields",
+            result["errors"][0],
+        )
+
+    async def test_preflight_reports_cost_ceiling_without_openai(self):
+        self.payload["max_iterations"] = 2
+
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/preflight",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result["valid"])
+        self.assertFalse(result["generation_ready"])
+        self.assertEqual(result["provider"], "codex")
+        self.assertEqual(result["model"], "gpt-5.3-codex")
+        self.assertEqual(
+            result["maximum_output_tokens_per_request"],
+            800,
+        )
+        self.assertEqual(result["maximum_generation_attempts"], 2)
+        self.assertEqual(result["worst_case_output_tokens"], 1600)
+        self.assertGreater(result["initial_request_characters"], 0)
+        self.assertIn("Pending mapping reviews", result["blockers"][0])
+
+    async def test_generation_requires_the_current_confirmed_ceiling(self):
+        self.approve_mapping_reviews()
+        self.payload["confirmed_output_token_ceiling"] = 400
+
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/generate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result["completed"])
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["output_token_ceiling"], 1600)
+        self.assertIn("Run preflight again", result["errors"][0])
+        run_agent.assert_not_called()
+
+    async def test_generation_returns_only_validated_sql_and_usage(self):
+        self.approve_mapping_reviews()
+        self.payload["confirmed_output_token_ceiling"] = 1600
+        generated_result = {
+            "status": "done",
+            "iterations": 1,
+            "output_sql": "select 1 as person_id",
+            "usage": {
+                "successful_api_responses": 1,
+                "input_tokens": 100,
+                "cached_input_tokens": 20,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 30,
+                "reasoning_output_tokens": 10,
+                "total_tokens": 130,
+            },
+            "transcript": [{"content": "must not be returned"}],
+        }
+
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch(
+                "agent.api.run_agent_with_specs",
+                return_value=generated_result,
+            ) as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/generate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result["completed"])
+        self.assertEqual(result["status"], "done")
+        self.assertEqual(result["output_sql"], "select 1 as person_id")
+        self.assertEqual(result["usage"]["total_tokens"], 130)
+        self.assertNotIn("transcript", result)
+        run_agent.assert_called_once()
+        self.assertFalse(
+            run_agent.call_args.kwargs["promote_output"],
+        )
+
+    async def test_generation_returns_bounded_validator_diagnostics(self):
+        self.approve_mapping_reviews()
+        self.payload["confirmed_output_token_ceiling"] = 1600
+        failed_result = {
+            "status": "max_iterations_reached",
+            "iterations": 2,
+            "diagnostics": [
+                "missing target fields: person_source_value",
+                "person_id uses undeclared source fields",
+            ],
+            "usage": {
+                "successful_api_responses": 2,
+                "input_tokens": 200,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 80,
+                "reasoning_output_tokens": 0,
+                "total_tokens": 280,
+            },
+            "transcript": [{"content": "must not be returned"}],
+        }
+
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch(
+                "agent.api.run_agent_with_specs",
+                return_value=failed_result,
+            ),
+        ):
+            response = await self.client.post(
+                "/v1/generate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        result = response.json()
+        self.assertFalse(result["completed"])
+        self.assertEqual(
+            result["status"],
+            "max_iterations_reached",
+        )
+        self.assertEqual(result["errors"], failed_result["diagnostics"])
+        self.assertNotIn("transcript", result)
+
+    async def test_request_errors_do_not_echo_submitted_values(self):
+        secret_value = "do-not-echo-this-sensitive-value"
+        self.payload["unexpected"] = secret_value
+
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/validate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertNotIn(secret_value, response.text)
+
+
+if __name__ == "__main__":
+    unittest.main()

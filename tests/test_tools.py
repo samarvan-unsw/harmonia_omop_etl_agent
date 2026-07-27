@@ -1,9 +1,11 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from agent.tools import (
+    _configured_output_dir,
     discard_candidate,
     promote_file,
     read_file,
@@ -76,6 +78,32 @@ class OutputToolSafetyTest(unittest.TestCase):
         """Whitespace-only output is not a valid generated artifact."""
         with self.assertRaisesRegex(ValueError, "SQL content cannot be empty"):
             write_file("person.sql", "   ")
+
+    def test_accepts_absolute_scratch_output_override(self):
+        """Hosted functions may isolate candidates in writable scratch space."""
+        scratch_dir = self.output_dir / "scratch"
+        with patch.dict(
+            os.environ,
+            {"AGENT_OUTPUT_DIR": str(scratch_dir)},
+        ):
+            self.assertEqual(_configured_output_dir(), scratch_dir)
+
+    def test_rejects_relative_or_broad_output_override(self):
+        """A deployment variable cannot redirect writes to an unsafe target."""
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_OUTPUT_DIR": "relative/output"},
+            ),
+            self.assertRaisesRegex(ValueError, "absolute path"),
+        ):
+            _configured_output_dir()
+
+        with (
+            patch.dict(os.environ, {"AGENT_OUTPUT_DIR": "/"}),
+            self.assertRaisesRegex(ValueError, "too broad"),
+        ):
+            _configured_output_dir()
 
 
 if __name__ == "__main__":
