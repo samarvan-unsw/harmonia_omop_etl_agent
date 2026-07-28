@@ -80,6 +80,13 @@ class AgentConfig(StrictModel):
 # SOURCE-SCHEMA YAML CONTRACT
 # =============================================================================
 
+class SourceForeignKey(StrictModel):
+    """A declared relationship to another source-model field."""
+
+    model: SqlIdentifier
+    field: SqlIdentifier
+
+
 class SourceColumn(StrictModel):
     """A source column available for OMOP mapping."""
 
@@ -87,6 +94,7 @@ class SourceColumn(StrictModel):
     data_type: str | None = None
     description: str = ""
     primary_key: bool = False
+    foreign_key: SourceForeignKey | None = None
 
 
 class SourceModel(StrictModel):

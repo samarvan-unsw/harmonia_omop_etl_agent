@@ -128,6 +128,22 @@ models:
 
 Declare every source column referenced by a mapping.
 
+Declare known source relationships on the foreign-key column:
+
+```yaml
+      - name: patient_id
+        data_type: integer
+        description: Patient linked to this encounter.
+        foreign_key:
+          model: cai_01_patient
+          field: patient_id
+```
+
+Foreign keys are optional metadata, but declaring them allows clients such as
+the CardiacAI OMOP Studio source explorer to show trustworthy table
+connections. Do not infer or declare a relationship from similar field names
+alone.
+
 ## 6. Use the OMOP target schemas
 
 The repository includes one generated YAML file for every OMOP CDM 5.4

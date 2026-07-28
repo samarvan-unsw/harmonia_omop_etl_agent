@@ -11,9 +11,16 @@ def _format_source_model(model: SourceModel) -> list[str]:
     for column in model.columns:
         data_type = f" ({column.data_type})" if column.data_type else ""
         primary_key = " [primary key]" if column.primary_key else ""
+        foreign_key = (
+            " [foreign key → "
+            f"{column.foreign_key.model}.{column.foreign_key.field}]"
+            if column.foreign_key
+            else ""
+        )
         description = f": {column.description}" if column.description else ""
         lines.append(
-            f"- {column.name}{data_type}{primary_key}{description}"
+            f"- {column.name}{data_type}{primary_key}{foreign_key}"
+            f"{description}"
         )
 
     return lines
