@@ -42,19 +42,19 @@ fields:
     transformation: Cast year_of_birth to integer.
 
   - target_field: month_of_birth
-    action: skip
+    action: "null"
     source_fields: []
-    transformation: Skip as directed by the projected OMOP comment.
+    transformation: Output NULL as directed by the projected OMOP comment.
 
   - target_field: day_of_birth
-    action: skip
+    action: "null"
     source_fields: []
-    transformation: Skip as directed by the projected OMOP comment.
+    transformation: Output NULL as directed by the projected OMOP comment.
 
   - target_field: birth_datetime
-    action: skip
+    action: "null"
     source_fields: []
-    transformation: Skip as directed by the projected OMOP comment.
+    transformation: Output NULL as directed by the projected OMOP comment.
 
   - target_field: race_concept_id
     action: derive
@@ -76,9 +76,9 @@ fields:
       mapping relation before generation.
 
   - target_field: ethnicity_concept_id
-    action: skip
+    action: "null"
     source_fields: []
-    transformation: Skip because the projected OMOP comment says "NA. Skip."
+    transformation: Output NULL because the projected OMOP comment says "NA."
 
   - target_field: person_source_value
     action: map

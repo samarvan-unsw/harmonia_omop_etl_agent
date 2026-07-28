@@ -159,7 +159,7 @@ def _validate_mapping_expressions(
             continue
 
         mapping = mappings.get(target_field)
-        if mapping is None or mapping.action in {"null", "skip"}:
+        if mapping is None or mapping.action == "null":
             if not _is_null_expression(expression):
                 action = mapping.action if mapping else "unmapped"
                 errors.append(

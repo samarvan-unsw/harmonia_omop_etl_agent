@@ -264,8 +264,12 @@ Defines how one OMOP target field is produced:
 `validate_action()` enforces:
 
 - `map` has exactly one source field.
-- `null` and `skip` have no source fields.
-- `null` and `skip` cannot use a mapping table.
+- A blank transformation uses a one-source 1:1 mapping with target datatype
+  conformity.
+- A multi-source derivation without a mapping table requires transformation
+  instructions.
+- `null` has no source fields.
+- `null` cannot use a mapping table.
 - A mapping table requires at least one source field.
 - Required reviews include both a comment and status.
 - Review status is not allowed unless review is required.
@@ -766,7 +770,7 @@ Runs all enabled validation layers:
 
 `_validate_mapping_expressions()` checks:
 
-- `null`, `skip` and unmapped fields output null.
+- `null` and unmapped fields output null.
 - Nulls are explicitly cast to the target datatype.
 - `map` and `derive` fields do not silently output null.
 - Expressions use declared source fields.

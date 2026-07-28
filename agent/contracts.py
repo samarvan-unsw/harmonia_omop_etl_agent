@@ -127,13 +127,25 @@ class FieldMapping(StrictModel):
     """Instructions for producing one OMOP target field."""
 
     target_field: SqlIdentifier
-    action: Literal["map", "derive", "null", "skip"]
+    action: Literal["map", "derive", "null"]
     source_fields: list[SourceFieldReference] = Field(default_factory=list)
-    transformation: str = Field(min_length=1)
+    transformation: str = ""
     mapping_table_name: SqlIdentifier | None = None
     review_required: bool = False
     review_status: Literal["pending", "approved"] | None = None
     review_comment: str | None = None
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def normalize_retired_skip_action(cls, value):
+        """Keep historical specifications readable after retiring `skip`."""
+        return "null" if value == "skip" else value
+
+    @field_validator("transformation", mode="before")
+    @classmethod
+    def normalize_empty_transformation(cls, value):
+        """Treat an empty YAML value as omitted transformation text."""
+        return "" if value is None else value
 
     @field_validator("mapping_table_name", mode="before")
     @classmethod
@@ -148,11 +160,20 @@ class FieldMapping(StrictModel):
         """Ensure each mapping action has a coherent source definition."""
         if self.action == "map" and len(self.source_fields) != 1:
             raise ValueError("map requires exactly one source field")
-        if self.action in {"null", "skip"} and self.source_fields:
+        if (
+            self.action in {"map", "derive"}
+            and not self.transformation.strip()
+            and "mapping_table_name" not in self.model_fields_set
+            and len(self.source_fields) != 1
+        ):
+            raise ValueError(
+                "a blank transformation requires exactly one source field"
+            )
+        if self.action == "null" and self.source_fields:
             raise ValueError(f"{self.action} cannot contain source fields")
         if (
             "mapping_table_name" in self.model_fields_set
-            and self.action in {"null", "skip"}
+            and self.action == "null"
         ):
             raise ValueError(
                 f"{self.action} cannot declare a mapping_table_name"

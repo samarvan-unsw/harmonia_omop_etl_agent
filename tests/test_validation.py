@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+from agent.context import build_context_from_specs
 from agent.validation import (
     SpecValidationError,
     pending_review_fields,
@@ -104,6 +105,108 @@ class MappingRuleValidationTest(unittest.TestCase):
         )
 
         self.assertEqual(ethnicity_mapping.action, "null")
+
+    def test_retired_skip_action_is_normalized_to_null(self):
+        """A historical skip action should remain readable as explicit null."""
+        mapping_path = self.specs_dir / "mappings" / "person.yml"
+        mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        month_mapping = next(
+            field
+            for field in mapping["fields"]
+            if field["target_field"] == "month_of_birth"
+        )
+        month_mapping["action"] = "skip"
+        mapping_path.write_text(
+            yaml.safe_dump(mapping, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        result = validate_specs("person", self.specs_dir)
+        normalized_mapping = next(
+            field
+            for field in result.mapping.fields
+            if field.target_field == "month_of_birth"
+        )
+
+        self.assertEqual(normalized_mapping.action, "null")
+
+    def test_omitted_transformation_uses_direct_mapping_fallback(self):
+        """One-source mappings may omit transformation instructions."""
+        mapping_path = self.specs_dir / "mappings" / "person.yml"
+        mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        year_mapping = next(
+            field
+            for field in mapping["fields"]
+            if field["target_field"] == "year_of_birth"
+        )
+        year_mapping.pop("transformation")
+        mapping_path.write_text(
+            yaml.safe_dump(mapping, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        result = validate_specs("person", self.specs_dir)
+        normalized_mapping = next(
+            field
+            for field in result.mapping.fields
+            if field.target_field == "year_of_birth"
+        )
+
+        self.assertEqual(normalized_mapping.transformation, "")
+        self.assertIn(
+            "Direct 1:1 source mapping; cast only as needed to conform to "
+            "the OMOP target datatype integer.",
+            build_context_from_specs(result),
+        )
+
+    def test_empty_yaml_transformation_uses_direct_mapping_fallback(self):
+        """An empty YAML value should behave like omitted transformation text."""
+        mapping_path = self.specs_dir / "mappings" / "person.yml"
+        mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        year_mapping = next(
+            field
+            for field in mapping["fields"]
+            if field["target_field"] == "year_of_birth"
+        )
+        year_mapping["transformation"] = None
+        mapping_path.write_text(
+            yaml.safe_dump(mapping, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        result = validate_specs("person", self.specs_dir)
+        normalized_mapping = next(
+            field
+            for field in result.mapping.fields
+            if field.target_field == "year_of_birth"
+        )
+
+        self.assertEqual(normalized_mapping.transformation, "")
+
+    def test_blank_multi_source_derivation_requires_instructions(self):
+        """A blank fallback must not guess how to combine source fields."""
+        mapping_path = self.specs_dir / "mappings" / "person.yml"
+        mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        year_mapping = next(
+            field
+            for field in mapping["fields"]
+            if field["target_field"] == "year_of_birth"
+        )
+        year_mapping["action"] = "derive"
+        year_mapping["source_fields"].append(
+            {"model": "cai_01_patient", "field": "sex"}
+        )
+        year_mapping["transformation"] = ""
+        mapping_path.write_text(
+            yaml.safe_dump(mapping, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(
+            SpecValidationError,
+            "blank transformation requires exactly one source field",
+        ):
+            validate_specs("person", self.specs_dir)
 
     def test_pending_review_fields_are_reported(self):
         """Structurally valid pending reviews should remain visible."""

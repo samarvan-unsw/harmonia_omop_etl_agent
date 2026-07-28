@@ -45,8 +45,11 @@ Output requirements:
 - Produce one SELECT statement with every target field in target-schema order.
 - Quote reserved target identifiers using the configured dialect's identifier
   quoting rules.
-- For fields with action `null`, action `skip`, or no mapping, emit a typed NULL.
+- For fields with action `null` or no mapping, emit a typed NULL.
 - Apply every declared join and transformation exactly as specified.
+- When no transformation is supplied for a mapped field without a mapping table,
+  map its single declared source field 1:1 and cast only as needed to conform to
+  the target OMOP datatype.
 - When a mapping table is specified, LEFT JOIN that relation by matching every
   declared source field to its same-named mapping-table column, then select the
   mapping table column whose name matches the target field.

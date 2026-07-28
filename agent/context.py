@@ -62,11 +62,23 @@ def _format_target_field(
     source_fields = ", ".join(
         f"{source.model}.{source.field}" for source in mapping.source_fields
     )
+    if mapping.transformation.strip():
+        transformation = mapping.transformation
+    elif mapping.mapping_table_name:
+        transformation = (
+            "No additional transformation beyond the declared mapping-table "
+            f"lookup and conformity to {target.data_type}."
+        )
+    else:
+        transformation = (
+            "Direct 1:1 source mapping; cast only as needed to conform to "
+            f"the OMOP target datatype {target.data_type}."
+        )
     lines.extend(
         [
             f"Mapping action: {mapping.action}",
             f"Sources: {source_fields or '(none)'}",
-            f"Transformation: {mapping.transformation}",
+            f"Transformation: {transformation}",
         ]
     )
     if mapping.mapping_table_name:
@@ -80,7 +92,7 @@ def _format_target_field(
                 f"{mapping_columns}; result column: {target.name}",
             ]
         )
-    if mapping.action in {"null", "skip"}:
+    if mapping.action == "null":
         lines.append("Output value: NULL.")
     if mapping.review_required:
         lines.extend(

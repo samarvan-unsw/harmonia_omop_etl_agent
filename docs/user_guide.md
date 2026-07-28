@@ -204,7 +204,6 @@ Mapping actions:
 | `map` | Map exactly one source field |
 | `derive` | Derive the target from one or more source fields |
 | `"null"` | Deliberately output a typed `NULL` |
-| `skip` | Skip an unavailable optional value and output a typed `NULL` |
 
 Always quote `"null"` because an unquoted YAML `null` means an empty YAML
 value.
@@ -214,6 +213,12 @@ Rules for missing fields:
 - A missing optional target field is automatically emitted as a typed `NULL`.
 - A missing required target field fails validation.
 - A required target may be deliberately mapped with `action: "null"`.
+
+Transformation text is optional for a direct mapping with exactly one source
+field. When omitted or blank, the agent maps that source field 1:1 and casts
+only as needed to conform to the OMOP target datatype. Multi-source derivations
+still require transformation instructions unless a mapping table defines the
+lookup.
 
 ### Source joins
 
