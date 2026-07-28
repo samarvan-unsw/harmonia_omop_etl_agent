@@ -255,6 +255,7 @@ class TargetSchemaDocument(StrictModel):
     """Root structure of one OMOP target-schema file."""
 
     version: Literal[1]
+    display_order: int = Field(ge=1)
     cdm_version: str
     target_table: SqlIdentifier
     cdm_schema: Literal["CDM", "VOCAB", "RESULTS"]

@@ -130,6 +130,7 @@ class TargetSchemaSummaryResponse(StrictApiModel):
     """Read-only summary of one agent-owned OMOP target table."""
 
     target_table: str
+    display_order: int
     cdm_schema: Literal["CDM", "VOCAB", "RESULTS"]
     cdm_version: str
     required: bool
@@ -171,6 +172,7 @@ class TargetSchemaResponse(StrictApiModel):
     """Complete validated target metadata without exposing YAML."""
 
     cdm_version: str
+    display_order: int
     target_table: str
     cdm_schema: Literal["CDM", "VOCAB", "RESULTS"]
     required: bool
@@ -407,7 +409,10 @@ def target_schema_catalog() -> TargetSchemaCatalogResponse:
         )
 
     try:
-        schemas = [_read_target_schema(path) for path in paths]
+        schemas = sorted(
+            (_read_target_schema(path) for path in paths),
+            key=lambda schema: schema.display_order,
+        )
     except RuntimeError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -415,7 +420,11 @@ def target_schema_catalog() -> TargetSchemaCatalogResponse:
         ) from error
 
     cdm_versions = {schema.cdm_version for schema in schemas}
-    if len(cdm_versions) != 1:
+    display_orders = [schema.display_order for schema in schemas]
+    if (
+        len(cdm_versions) != 1
+        or display_orders != list(range(1, len(schemas) + 1))
+    ):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Target schema catalog is unavailable.",
@@ -424,6 +433,7 @@ def target_schema_catalog() -> TargetSchemaCatalogResponse:
     tables = [
         TargetSchemaSummaryResponse(
             target_table=schema.target_table,
+            display_order=schema.display_order,
             cdm_schema=schema.cdm_schema,
             cdm_version=schema.cdm_version,
             required=schema.required,

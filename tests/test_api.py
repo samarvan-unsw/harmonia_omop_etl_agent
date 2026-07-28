@@ -106,6 +106,11 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["table_count"], 39)
         self.assertEqual(result["field_count"], 432)
         self.assertEqual(len(result["tables"]), 39)
+        self.assertEqual(
+            [table["display_order"] for table in result["tables"]],
+            list(range(1, 40)),
+        )
+        self.assertEqual(result["tables"][0]["target_table"], "person")
         person = next(
             table
             for table in result["tables"]
@@ -127,6 +132,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertEqual(result["target_table"], "person")
+        self.assertEqual(result["display_order"], 1)
         self.assertEqual(len(result["fields"]), 18)
         gender_concept = next(
             field

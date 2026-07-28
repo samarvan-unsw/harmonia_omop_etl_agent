@@ -198,6 +198,7 @@ def _field_document(row: dict[str, str]) -> dict:
 def _table_document(
     row: dict[str, str],
     fields: list[dict[str, str]],
+    display_order: int,
 ) -> dict:
     """Convert one official table row and its ordered fields."""
     threshold = _optional_text(
@@ -205,6 +206,7 @@ def _table_document(
     )
     document = {
         "version": 1,
+        "display_order": display_order,
         "cdm_version": "5.4",
         "target_table": _identifier(row["cdmTableName"]),
         "cdm_schema": row["schema"].strip(),
@@ -267,12 +269,16 @@ def main() -> None:
         )
 
     documents = {}
-    for row in table_rows:
+    for display_order, row in enumerate(table_rows, start=1):
         table_name = row["cdmTableName"]
         fields = fields_by_table.pop(table_name, [])
         if not fields:
             raise ValueError(f"{table_name} has no field metadata")
-        documents[table_name.casefold()] = _table_document(row, fields)
+        documents[table_name.casefold()] = _table_document(
+            row,
+            fields,
+            display_order,
+        )
     if fields_by_table:
         raise ValueError(
             "Field metadata exists for unknown tables: "

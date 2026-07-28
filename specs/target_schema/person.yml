@@ -2,6 +2,7 @@
 # Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
 # Regenerate with: python scripts/generate_target_schemas.py
 version: 1
+display_order: 1
 cdm_version: '5.4'
 target_table: person
 cdm_schema: CDM

@@ -56,3 +56,16 @@ class TargetSchemaCollectionTest(unittest.TestCase):
         """Prevent mixed CDM versions in the agent-owned target catalog."""
         for document in self.documents.values():
             self.assertEqual(document.cdm_version, "5.4")
+
+    def test_display_order_matches_official_metadata(self):
+        """Preserve the table sequence used by the official CDM guide."""
+        ordered = sorted(
+            self.documents.values(),
+            key=lambda document: document.display_order,
+        )
+        self.assertEqual(
+            [document.display_order for document in ordered],
+            list(range(1, 40)),
+        )
+        self.assertEqual(ordered[0].target_table, "person")
+        self.assertEqual(ordered[1].target_table, "observation_period")
