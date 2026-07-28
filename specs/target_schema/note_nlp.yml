@@ -1,0 +1,157 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: note_nlp
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The NOTE_NLP table encodes all output of NLP on clinical notes. Each row represents a single extracted
+  term from a note.
+user_guidance: ""
+etl_convention: ""
+fields:
+- name: note_nlp_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    A unique identifier for the NLP record.
+  etl_convention: ""
+- name: note_id
+  data_type: integer
+  required: true
+  primary_key: false
+  description: >-
+    This is the NOTE_ID for the NOTE record the NLP record is associated to.
+  etl_convention: ""
+- name: section_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    The SECTION_CONCEPT_ID should be used to represent the note section contained in the NOTE_NLP record.
+    These concepts can be found as parts of document panels and are based on the type of note written,
+    i.e. a discharge summary. These panels can be found as concepts with the relationship 'Subsumes' to
+    CONCEPT_ID [45875957](https://athena.ohdsi.org/search-terms/terms/45875957).
+- name: snippet
+  data_type: varchar(250)
+  required: false
+  primary_key: false
+  description: >-
+    A small window of text surrounding the term
+  etl_convention: ""
+- name: offset
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    Character offset of the extracted term in the input note
+  etl_convention: ""
+- name: lexical_variant
+  data_type: varchar(250)
+  required: true
+  primary_key: false
+  description: >-
+    Raw text extracted from the NLP tool.
+  etl_convention: ""
+- name: note_nlp_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: note_nlp_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: nlp_system
+  data_type: varchar(250)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Name and version of the NLP system that extracted the term. Useful for data provenance.
+- name: nlp_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date of the note processing.
+  etl_convention: ""
+- name: nlp_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: >-
+    The date and time of the note processing.
+  etl_convention: ""
+- name: term_exists
+  data_type: varchar(1)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Term_exists is defined as a flag that indicates if the patient actually has or had the condition.
+    Any of the following modifiers would make Term_exists false:
+
+    Negation = true
+
+    Subject = [anything other than the patient]
+
+    Conditional = true
+
+    Rule_out = true
+
+    Uncertain = very low certainty or any lower certainties
+
+    A complete lack of modifiers would make Term_exists true.
+- name: term_temporal
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Term_temporal is to indicate if a condition is present or just in the past. The following would be
+    past:
+
+
+    - History = true
+
+    - Concept_date = anything before the time of the report
+- name: term_modifiers
+  data_type: varchar(2000)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    For the modifiers that are there, they would have to have these values:
+
+
+    - Negation = false
+
+    - Subject = patient
+
+    - Conditional = false
+
+    - Rule_out = false
+
+    - Uncertain = true or high or moderate or even low (could argue about low). Term_modifiers will concatenate
+    all modifiers for different types of entities (conditions, drugs, labs etc) into one string. Lab values
+    will be saved as one of the modifiers.

@@ -234,7 +234,9 @@ class TargetForeignKey(StrictModel):
     """An OMOP foreign-key target and optional vocabulary domain."""
 
     table: SqlIdentifier
+    field: SqlIdentifier | None = None
     domain: str | None = None
+    class_name: str | None = None
 
 
 class TargetField(StrictModel):
@@ -255,6 +257,14 @@ class TargetSchemaDocument(StrictModel):
     version: Literal[1]
     cdm_version: str
     target_table: SqlIdentifier
+    cdm_schema: Literal["CDM", "VOCAB", "RESULTS"]
+    required: bool
+    concept_prefix: str | None = None
+    measure_person_completeness: bool
+    measure_person_completeness_threshold: float | None = None
+    description: str = ""
+    user_guidance: str = ""
+    etl_convention: str = ""
     fields: list[TargetField] = Field(min_length=1)
 
     @model_validator(mode="after")

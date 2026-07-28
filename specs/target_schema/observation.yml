@@ -1,0 +1,301 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: observation
+cdm_schema: CDM
+required: false
+concept_prefix: OBSERVATION_
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  The OBSERVATION table captures clinical facts about a Person obtained in the context of examination,
+  questioning or a procedure. Any data that cannot be represented by any other domains, such as social
+  and lifestyle facts, medical history, family history, etc. are recorded here.
+user_guidance: >-
+  Observations differ from Measurements in that they do not require a standardized test or some other
+  activity to generate clinical fact. Typical observations are medical history, family history, the stated
+  need for certain treatment, social circumstances, lifestyle choices, healthcare utilization patterns,
+  etc. If the generation clinical facts requires a standardized testing such as lab testing or imaging
+  and leads to a standardized result, the data item is recorded in the MEASUREMENT table. If the clinical
+  fact observed determines a sign, symptom, diagnosis of a disease or other medical condition, it is recorded
+  in the CONDITION_OCCURRENCE table. Valid Observation Concepts are not enforced to be from any domain
+  but they must not belong to the Condition, Procedure, Drug, Device, Specimen, or Measurement domains
+  and they must be Standard Concepts.
+
+
+  The observation table usually records the date or datetime of when the observation was obtained, not
+  the date of the observation starting. For example, if the patient reports that they had a heart attack
+  when they were 50, the observation date or datetime is the date of the report, the heart attack observation
+  can have a value_as_concept which captures how long ago the observation applied to the patient.
+etl_convention: >-
+  Records whose Source Values map to any domain besides Condition, Procedure, Drug, Specimen, Measurement
+  or Device should be stored in the Observation table. Observations can be stored as attribute value pairs,
+  with the attribute as the Observation Concept and the value representing the clinical fact. This fact
+  can be a Concept (stored in VALUE_AS_CONCEPT), a numerical value (VALUE_AS_NUMBER) or a verbatim string
+  (VALUE_AS_STRING). Even though Observations do not have an explicit result, the clinical fact can be
+  stated separately from the type of Observation in the VALUE_AS_* fields. It is recommended for Observations
+  that are suggestive statements of positive assertion should have a value of 'Yes' (concept_id=4188539),
+  recorded, even though the null value is the equivalent.
+fields:
+- name: observation_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    The unique key given to an Observation record for a Person. Refer to the ETL for how duplicate Observations
+    during the same Visit were handled.
+  etl_convention: >-
+    Each instance of an observation present in the source data should be assigned this unique key.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The PERSON_ID of the Person for whom the Observation is recorded. This may be a system generated code.
+  etl_convention: ""
+- name: observation_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    The OBSERVATION_CONCEPT_ID field is recommended for primary use in analyses, and must be used for
+    network studies.
+  etl_convention: >-
+    The CONCEPT_ID that the OBSERVATION_SOURCE_CONCEPT_ID maps to. There is no specified domain that the
+    Concepts in this table must adhere to. The only rule is that records with Concepts in the Condition,
+    Procedure, Drug, Measurement, or Device domains MUST go to the corresponding table.
+- name: observation_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date of when the Observation was obtained. Depending on what the Observation represents this could
+    be the date of a lab test, the date of a survey, or the date a patient's family history was taken.
+  etl_convention: >-
+    For some observations the ETL may need to make a choice as to which date to choose.
+- name: observation_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If no time is given set to midnight (00:00:00).
+- name: observation_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    This field can be used to determine the provenance of the Observation record, as in whether the measurement
+    was from an EHR system, insurance claim, registry, or other sources.
+  etl_convention: >-
+    Choose the OBSERVATION_TYPE_CONCEPT_ID that best represents the provenance of the record, for example
+    whether it came from an EHR record or billing claim. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: value_as_number
+  data_type: float
+  required: false
+  primary_key: false
+  description: >-
+    This is the numerical value of the Result of the Observation, if applicable and available. It is not
+    expected that all Observations will have numeric results, rather, this field is here to house values
+    should they exist.
+  etl_convention: ""
+- name: value_as_string
+  data_type: varchar(60)
+  required: false
+  primary_key: false
+  description: >-
+    This is the categorical value of the Result of the Observation, if applicable and available.
+  etl_convention: ""
+- name: value_as_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    It is possible that some records destined for the Observation table have two clinical ideas represented
+    in one source code. This is common with ICD10 codes that describe a family history of some Condition,
+    for example. In OMOP the Vocabulary breaks these two clinical ideas into two codes; one becomes the
+    OBSERVATION_CONCEPT_ID and the other becomes the VALUE_AS_CONCEPT_ID. It is important when using the
+    Observation table to keep this possibility in mind and to examine the VALUE_AS_CONCEPT_ID field for
+    relevant information.
+  etl_convention: >-
+    Note that the value of VALUE_AS_CONCEPT_ID may be provided through mapping from a source Concept which
+    contains the content of the Observation. In those situations, the CONCEPT_RELATIONSHIP table in addition
+    to the 'Maps to' record contains a second record with the relationship_id set to 'Maps to value'.
+    For example, ICD10 [Z82.4](https://athena.ohdsi.org/search-terms/terms/45581076) 'Family history of
+    ischaemic heart disease and other diseases of the circulatory system' has a 'Maps to' relationship
+    to [4167217](https://athena.ohdsi.org/search-terms/terms/4167217) 'Family history of clinical finding'
+    as well as a 'Maps to value' record to [134057](https://athena.ohdsi.org/search-terms/terms/134057)
+    'Disorder of cardiovascular system'. If there's no categorial result in a source_data, set value_as_concept_id
+    to NULL, if there is a categorial result in a source_data but without mapping, set value_as_concept_id
+    to 0.
+- name: qualifier_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This field contains all attributes specifying the clinical fact further, such as as degrees, severities,
+    drug-drug interaction alerts etc.
+  etl_convention: >-
+    Use your best judgement as to what Concepts to use here and if they are necessary to accurately represent
+    the clinical record. There is no restriction on the domain of these Concepts, they just need to be
+    Standard.
+- name: unit_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Unit
+  description: >-
+    There is currently no recommended unit for individual observation concepts. UNIT_SOURCE_VALUES should
+    be mapped to a Standard Concept in the Unit domain that best represents the unit as given in the source
+    data.
+  etl_convention: >-
+    There is no standardization requirement for units associated with OBSERVATION_CONCEPT_IDs, however,
+    it is the responsibility of the ETL to choose the most plausible unit. If the source unit is NULL
+    (applicable to cases when there's no numerical value or when it doesn't require a unit), keep unit_concept_id
+    NULL as well. If there's no mapping of a source unit, populate unit_concept_id with 0.
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    The provider associated with the observation record, e.g. the provider who ordered the test or the
+    provider who recorded the result.
+  etl_convention: >-
+    The ETL may need to make a choice as to which PROVIDER_ID to put here. Based on what is available
+    this may or may not be different than the provider associated with the overall VISIT_OCCURRENCE record.
+    For example the admitting vs attending physician on an EHR record.
+- name: visit_occurrence_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_occurrence
+    field: visit_occurrence_id
+  description: >-
+    The visit during which the Observation occurred.
+  etl_convention: >-
+    Depending on the structure of the source data, this may have to be determined based on dates. If an
+    OBSERVATION_DATE occurs within the start and end date of a Visit it is a valid ETL choice to choose
+    the VISIT_OCCURRENCE_ID from the visit that subsumes it, even if not explicitly stated in the data.
+    While not required, an attempt should be made to locate the VISIT_OCCURRENCE_ID of the observation
+    record. If an observation is related to a visit explicitly in the source data, it is possible that
+    the result date of the Observation falls outside of the bounds of the Visit dates.
+- name: visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    The VISIT_DETAIL record during which the Observation occurred. For example, if the Person was in the
+    ICU at the time the VISIT_OCCURRENCE record would reflect the overall hospital stay and the VISIT_DETAIL
+    record would reflect the ICU stay during the hospital visit.
+  etl_convention: >-
+    Same rules apply as for the VISIT_OCCURRENCE_ID.
+- name: observation_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the Observation that occurred.
+    For example, this could be an ICD10 or Read code.
+  etl_convention: >-
+    This code is mapped to a Standard Concept in the Standardized Vocabularies and the original code is
+    stored here for reference.
+- name: observation_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the concept representing the OBSERVATION_SOURCE_VALUE and may not necessarily be standard.
+    This field is discouraged from use in analysis because it is not required to contain Standard Concepts
+    that are used across the OHDSI community, and should only be used when Standard Concepts do not adequately
+    represent the source detail for the Observation necessary for a given analytic use case. Consider
+    using OBSERVATION_CONCEPT_ID instead to enable standardized analytics that can be consistent across
+    the network.
+  etl_convention: >-
+    If the OBSERVATION_SOURCE_VALUE is coded in the source data using an OMOP supported vocabulary put
+    the concept id representing the source value here.
+- name: unit_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the unit of the Observation
+    that occurred.
+  etl_convention: >-
+    This code is mapped to a Standard Condition Concept in the Standardized Vocabularies and the original
+    code is stored here for reference.
+- name: qualifier_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the qualifier of the Observation
+    that occurred.
+  etl_convention: >-
+    This code is mapped to a Standard Condition Concept in the Standardized Vocabularies and the original
+    code is stored here for reference.
+- name: value_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim result value of the Observation from the source data. Do not get confused
+    with the Observation_source_value which captures source value of the observation mapped to observation_concept_id.
+    This field is the observation result value from the source.
+  etl_convention: >-
+    If the observation_source_value was a question, for example, or an observation that requires a result
+    then this field is the answer/ result from the source data. Store the verbatim value that represents
+    the result of the observation_source_value.
+- name: observation_event_id
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    If the Observation record is related to another record in the database, this field is the primary
+    key of the linked record.
+  etl_convention: >-
+    Put the primary key of the linked record, if applicable, here. See the [ETL Conventions for the OBSERVATION](https://ohdsi.github.io/CommonDataModel/cdm54.html#observation)
+    table for more details.
+- name: obs_event_field_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    If the Observation record is related to another record in the database, this field is the CONCEPT_ID
+    that identifies which table the primary key of the linked record came from.
+  etl_convention: >-
+    Put the CONCEPT_ID that identifies which table and field the OBSERVATION_EVENT_ID came from.

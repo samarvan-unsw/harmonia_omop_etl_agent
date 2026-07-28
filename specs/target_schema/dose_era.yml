@@ -1,0 +1,81 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: dose_era
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  A Dose Era is defined as a span of time when the Person is assumed to be exposed to a constant dose
+  of a specific active ingredient.
+user_guidance: ""
+etl_convention: >-
+  Dose Eras will be derived from records in the DRUG_EXPOSURE table and the Dose information from the
+  DRUG_STRENGTH table using a standardized algorithm. Dose Form information is not taken into account.
+  So, if the patient changes between different formulations, or different manufacturers with the same
+  formulation, the Dose Era is still spanning the entire time of exposure to the Ingredient.
+fields:
+- name: dose_era_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: ""
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: drug_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Drug
+    class_name: Ingredient
+  description: >-
+    The Concept Id representing the specific drug ingredient.
+  etl_convention: ""
+- name: unit_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Unit
+  description: >-
+    The Concept Id representing the unit of the specific drug ingredient.
+  etl_convention: ""
+- name: dose_value
+  data_type: float
+  required: true
+  primary_key: false
+  description: >-
+    The numeric value of the dosage of the drug_ingredient.
+  etl_convention: ""
+- name: dose_era_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date the Person started on the specific dosage, with at least 31 days since any prior exposure.
+  etl_convention: ""
+- name: dose_era_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    The date the Person was no longer exposed to the dosage of the specific drug ingredient. An era is
+    ended if there are 31 days or more between dosage records.

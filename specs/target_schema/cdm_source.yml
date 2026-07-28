@@ -1,0 +1,102 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: cdm_source
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The CDM_SOURCE table contains detail about the source database and the process used to transform the
+  data into the OMOP Common Data Model.
+user_guidance: ""
+etl_convention: ""
+fields:
+- name: cdm_source_name
+  data_type: varchar(255)
+  required: true
+  primary_key: false
+  description: >-
+    The name of the CDM instance.
+  etl_convention: ""
+- name: cdm_source_abbreviation
+  data_type: varchar(25)
+  required: true
+  primary_key: false
+  description: >-
+    The abbreviation of the CDM instance.
+  etl_convention: ""
+- name: cdm_holder
+  data_type: varchar(255)
+  required: true
+  primary_key: false
+  description: >-
+    The holder of the CDM instance.
+  etl_convention: ""
+- name: source_description
+  data_type: varchar
+  required: false
+  primary_key: false
+  description: >-
+    The description of the CDM instance.
+  etl_convention: ""
+- name: source_documentation_reference
+  data_type: varchar(255)
+  required: false
+  primary_key: false
+  description: >-
+    Refers to a publication or web resource describing the source data, e.g. a data dictionary.
+  etl_convention: ""
+- name: cdm_etl_reference
+  data_type: varchar(255)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Version of the ETL script used. e.g. link to the Git release
+- name: source_release_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date the data was extracted from the source system. In some systems that is the same as the date
+    the ETL was run. Typically the latest even date in the source is on the source_release_date.
+  etl_convention: ""
+- name: cdm_release_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date the ETL script was completed. Typically this is after the source_release_date.
+  etl_convention: ""
+- name: cdm_version
+  data_type: varchar(10)
+  required: false
+  primary_key: false
+  description: >-
+    Version of the OMOP CDM used as string. e.g. v5.4
+  etl_convention: ""
+- name: cdm_version_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    The Concept Id representing the version of the CDM.
+  etl_convention: >-
+    You can find all concepts that represent the CDM versions using the query: `SELECT * FROM CONCEPT
+    WHERE VOCABULARY_ID = 'CDM' AND CONCEPT_CLASS = 'CDM'`
+- name: vocabulary_version
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  description: >-
+    Version of the OMOP standardised vocabularies loaded
+  etl_convention: >-
+    You can find the version of your Vocabulary using the query: `SELECT vocabulary_version from vocabulary
+    where vocabulary_id = 'None'`

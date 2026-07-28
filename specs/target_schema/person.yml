@@ -1,163 +1,229 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
 version: 1
-cdm_version: "5.4"
+cdm_version: '5.4'
 target_table: person
+cdm_schema: CDM
+required: true
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  This table serves as the central identity management for all Persons in the database. It contains records
+  that uniquely identify each person or patient, and some demographic information.
+user_guidance: >-
+  All records in this table are independent Persons.
+etl_convention: >-
+  All Persons in a database needs one record in this table, unless they fail data quality requirements
+  specified in the ETL. Persons with no Events should have a record nonetheless. If more than one data
+  source contributes Events to the database, Persons must be reconciled, if possible, across the sources
+  to create one single record per Person. The content of the BIRTH_DATETIME must be equivalent to the
+  content of BIRTH_DAY, BIRTH_MONTH and BIRTH_YEAR.
 
+
+  For detailed conventions for how to populate this table, please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/person.html).
 fields:
-  - name: person_id
-    data_type: integer
-    required: true
-    primary_key: true
-    description: >
-      Every person with a different unique identifier is assumed to be a
-      different person and should be treated independently.
-    etl_convention: >
-      Complete person linkage before writing this table. Use the original
-      source identifier when it is an integer; otherwise generate an integer.
-
-  - name: gender_concept_id
-    data_type: integer
-    required: true
-    foreign_key:
-      table: concept
-      domain: Gender
-    description: >
-      Captures biological sex at birth and should not be used for gender
-      identity analysis.
-    etl_convention: >
-      Use the source sex value only when it represents biological sex at birth.
-      Store gender identity information in the observation table.
-
-  - name: year_of_birth
-    data_type: integer
-    required: true
-    description: Compute age using year_of_birth.
-    etl_convention: >
-      Extract the year from the date of birth. If no year is available, the
-      person's data should not be loaded into the CDM.
-
-  - name: month_of_birth
-    data_type: integer
-    required: false
-    etl_convention: >
-      Extract the month when the source provides a precise date of birth.
-
-  - name: day_of_birth
-    data_type: integer
-    required: false
-    etl_convention: >
-      Extract the day when the source provides a precise date of birth.
-
-  - name: birth_datetime
-    data_type: datetime
-    required: false
-    etl_convention: >
-      Store the precise birth datetime when available. This field is optional
-      but strongly encouraged.
-
-  - name: race_concept_id
-    data_type: integer
-    required: true
-    foreign_key:
-      table: concept
-      domain: Race
-    description: Captures the person's race or ethnic background.
-    etl_convention: >
-      Use an accepted standard Race concept. Mixed races are not supported.
-      Use concept ID 0 when a clear race or ethnic background cannot be
-      established.
-
-  - name: ethnicity_concept_id
-    data_type: integer
-    required: true
-    foreign_key:
-      table: concept
-      domain: Ethnicity
-    description: >
-      Captures US OMB ethnicity: Hispanic or Not Hispanic. Race and other
-      ethnic backgrounds are not stored here.
-    etl_convention: >
-      Populate only for US-based data with an explicit source. Do not infer
-      ethnicity from race or ethnic background.
-
-  - name: location_id
-    data_type: integer
-    required: false
-    foreign_key:
-      table: location
-    description: The person's last known physical location.
-    etl_convention: >
-      Use the location_id representing the most granular available location.
-
-  - name: provider_id
-    data_type: integer
-    required: false
-    foreign_key:
-      table: provider
-    description: The person's last known primary care provider.
-    etl_convention: >
-      Use the last known general practitioner. If several providers exist, the
-      ETL must define which one is selected.
-
-  - name: care_site_id
-    data_type: integer
-    required: false
-    foreign_key:
-      table: care_site
-    description: The care site where the primary care provider typically works.
-
-  - name: person_source_value
-    data_type: varchar(50)
-    required: false
-    description: Original source identifier used to trace the person.
-    etl_convention: >
-      Preserve the source person value for lineage and ETL error checking.
-
-  - name: gender_source_value
-    data_type: varchar(50)
-    required: false
-    description: Biological sex value as represented in the source.
-    etl_convention: Preserve assigned sex at birth exactly as it appears in the source.
-
-  - name: gender_source_concept_id
-    data_type: integer
-    required: false
-    foreign_key:
-      table: concept
-    description: Source concept identifier for non-standard coded sex.
-    etl_convention: >
-      Store the source concept when sex is coded in a supported non-standard
-      vocabulary; otherwise this commonly remains zero.
-
-  - name: race_source_value
-    data_type: varchar(50)
-    required: false
-    description: Race value as represented in the source.
-    etl_convention: Preserve the source race value for reference.
-
-  - name: race_source_concept_id
-    data_type: integer
-    required: false
-    foreign_key:
-      table: concept
-    description: Source concept identifier for coded race.
-    etl_convention: >
-      Store the source concept when race uses an OMOP-supported vocabulary;
-      otherwise this commonly remains zero.
-
-  - name: ethnicity_source_value
-    data_type: varchar(50)
-    required: false
-    description: Ethnicity value as represented in the source.
-    etl_convention: >
-      Preserve non-OMB source ethnicity values here rather than inferring the
-      standard ethnicity concept.
-
-  - name: ethnicity_source_concept_id
-    data_type: integer
-    required: false
-    foreign_key:
-      table: concept
-    description: Source concept identifier for coded ethnicity.
-    etl_convention: >
-      Store the source concept when ethnicity uses an OMOP-supported
-      vocabulary; otherwise this commonly remains zero.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    It is assumed that every person with a different unique identifier is in fact a different person and
+    should be treated independently.
+  etl_convention: >-
+    Any person linkage that needs to occur to uniquely identify Persons ought to be done prior to writing
+    this table. This identifier can be the original id from the source data provided if it is an integer,
+    otherwise it can be an autogenerated number.
+- name: gender_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Gender
+  description: >-
+    This field is meant to capture the biological sex at birth of the Person. This field should not be
+    used to study gender identity issues.
+  etl_convention: >-
+    Use the gender or sex value present in the data under the assumption that it is the biological sex
+    at birth. If the source data captures gender identity it should be stored in the [OBSERVATION](https://ohdsi.github.io/CommonDataModel/cdm54.html#observation)
+    table. [Accepted gender concepts](http://athena.ohdsi.org/search-terms/terms?domain=Gender&standardConcept=Standard&page=1&pageSize=15&query=).
+    Please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/tag_gender_concept_id.html)
+    for detailed conventions on how to populate this field.
+- name: year_of_birth
+  data_type: integer
+  required: true
+  primary_key: false
+  description: >-
+    Compute age using year_of_birth.
+  etl_convention: >-
+    For data sources with date of birth, the year should be extracted. If no year of birth is available
+    all the person's data should be dropped from the CDM instance. For additional information on how to
+    populate this field, please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/tag_year_of_birth.html).
+- name: month_of_birth
+  data_type: integer
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    For data sources that provide the precise date of birth, the month should be extracted and stored
+    in this field.
+- name: day_of_birth
+  data_type: integer
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    For data sources that provide the precise date of birth, the day should be extracted and stored in
+    this field.
+- name: birth_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This field is not required but highly encouraged. For data sources that provide the precise datetime
+    of birth, that value should be stored in this field. For more information on how to populate this
+    field, please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/person.html).
+- name: race_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Race
+  description: >-
+    This field captures race or ethnic background of the person.
+  etl_convention: >-
+    Only use this field if you have information about race or ethnic background. The Vocabulary contains
+    Concepts about the main races and ethnic backgrounds in a hierarchical system. Due to the imprecise
+    nature of human races and ethnic backgrounds, this is not a perfect system. Mixed races are not supported.
+    If a clear race or ethnic background cannot be established, use Concept_Id 0. [Accepted Race Concepts](http://athena.ohdsi.org/search-terms/terms?domain=Race&standardConcept=Standard&page=1&pageSize=15&query=).
+- name: ethnicity_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Ethnicity
+  description: >-
+    This field captures Ethnicity as defined by the Office of Management and Budget (OMB) of the US Government:
+    it distinguishes only between "Hispanic" and "Not Hispanic". Races and ethnic backgrounds are not
+    stored here.
+  etl_convention: >-
+    Only use this field if you have US-based data and a source of this information. Do not attempt to
+    infer Ethnicity from the race or ethnic background of the Person. [Accepted ethnicity concepts](http://athena.ohdsi.org/search-terms/terms?domain=Ethnicity&standardConcept=Standard&page=1&pageSize=15&query=)
+- name: location_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: location
+    field: location_id
+  description: >-
+    The location refers to the physical address of the person. This field should capture the last known
+    location of the person.
+  etl_convention: >-
+    Put the location_id from the [LOCATION](https://ohdsi.github.io/CommonDataModel/cdm54.html#location)
+    table here that represents the most granular location information for the person. For additional information
+    on how to populate this field, please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/populate_person_location_id.html).
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    The Provider refers to the last known primary care provider (General Practitioner).
+  etl_convention: >-
+    Put the provider_id from the [PROVIDER](https://ohdsi.github.io/CommonDataModel/cdm54.html#provider)
+    table of the last known general practitioner of the person. If there are multiple providers, it is
+    up to the ETL to decide which to put here.
+- name: care_site_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: care_site
+    field: care_site_id
+  description: >-
+    The Care Site refers to where the Provider typically provides the primary care.
+  etl_convention: ""
+- name: person_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    Use this field to link back to persons in the source data. This is typically used for error checking
+    of ETL logic.
+  etl_convention: >-
+    Some use cases require the ability to link back to persons in the source data. This field allows for
+    the storing of the person value as it appears in the source. This field is not required but strongly
+    recommended.
+- name: gender_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field is used to store the biological sex of the person from the source data. It is not intended
+    for use in standard analytics but for reference only.
+  etl_convention: >-
+    Put the assigned sex at birth of the person as it appears in the source data.
+- name: gender_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    Due to the small number of options, this tends to be zero.
+  etl_convention: >-
+    If the source data codes assigned sex at birth in a non-standard vocabulary, store the concept_id
+    here.
+- name: race_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field is used to store the race of the person from the source data. It is not intended for use
+    in standard analytics but for reference only.
+  etl_convention: >-
+    Put the race of the person as it appears in the source data.
+- name: race_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    Due to the small number of options, this tends to be zero.
+  etl_convention: >-
+    If the source data codes race in an OMOP supported vocabulary store the concept_id here.
+- name: ethnicity_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field is used to store the ethnicity of the person from the source data. It is not intended for
+    use in standard analytics but for reference only.
+  etl_convention: >-
+    If the person has an ethnicity other than the OMB standard of "Hispanic" or "Not Hispanic" store that
+    value from the source data here.
+- name: ethnicity_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    Due to the small number of options, this tends to be zero.
+  etl_convention: >-
+    If the source data codes ethnicity in an OMOP supported vocabulary, store the concept_id here.

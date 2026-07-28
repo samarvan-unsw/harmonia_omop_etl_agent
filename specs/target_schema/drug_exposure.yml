@@ -1,0 +1,311 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: drug_exposure
+cdm_schema: CDM
+required: false
+concept_prefix: DRUG_
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  This table captures records about the exposure to a Drug ingested or otherwise introduced into the body.
+  A Drug is a biochemical substance formulated in such a way that when administered to a Person it will
+  exert a certain biochemical effect on the metabolism. Drugs include prescription and over-the-counter
+  medicines, vaccines, and large-molecule biologic therapies. Radiological devices ingested or applied
+  locally do not count as Drugs.
+user_guidance: >-
+  The purpose of records in this table is to indicate an exposure to a certain drug as best as possible.
+  In this context a drug is defined as an active ingredient. Drug Exposures are defined by Concepts from
+  the Drug domain, which form a complex hierarchy. As a result, one DRUG_SOURCE_CONCEPT_ID may map to
+  multiple standard concept ids if it is a combination product. Records in this table represent prescriptions
+  written, prescriptions dispensed, and drugs administered by a provider to name a few. The DRUG_TYPE_CONCEPT_ID
+  can be used to find and filter on these types. This table includes additional information about the
+  drug products, the quantity given, and route of administration.
+etl_convention: >-
+  Information about quantity and dose is provided in a variety of different ways and it is important for
+  the ETL to provide as much information as possible from the data. Depending on the provenance of the
+  data fields may be captured differently i.e. quantity for drugs administered may have a separate meaning
+  from quantity for prescriptions dispensed. If a patient has multiple records on the same day for the
+  same drug or procedures the ETL should not de-dupe them unless there is probable reason to believe the
+  item is a true data duplicate. Take note on how to handle refills for prescriptions written.
+
+
+  For detailed conventions on how to populate this table, please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/drug_exposure.html).
+fields:
+- name: drug_exposure_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    The unique key given to records of drug dispensings or administrations for a person. Refer to the
+    ETL for how duplicate drugs during the same visit were handled.
+  etl_convention: >-
+    Each instance of a drug dispensing or administration present in the source data should be assigned
+    this unique key. In some cases, a person can have multiple records of the same drug within the same
+    visit. It is valid to keep these duplicates and assign them individual, unique, DRUG_EXPOSURE_IDs,
+    though it is up to the ETL how they should be handled.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The PERSON_ID of the PERSON for whom the drug dispensing or administration is recorded. This may be
+    a system generated code.
+  etl_convention: ""
+- name: drug_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Drug
+  description: >-
+    The DRUG_CONCEPT_ID field is recommended for primary use in analyses, and must be used for network
+    studies. This is the standard concept mapped from the source concept id which represents a drug product
+    or molecule otherwise introduced to the body. The drug concepts can have a varying degree of information
+    about drug strength and dose. This information is relevant in the context of quantity and administration
+    information in the subsequent fields plus strength information from the DRUG_STRENGTH table, provided
+    as part of the standard vocabulary download.
+  etl_convention: >-
+    The CONCEPT_ID that the DRUG_SOURCE_VALUE maps to. The concept id should be derived either from mapping
+    from the source concept id or by picking the drug concept representing the most amount of detail you
+    have. Records whose source values map to standard concepts with a domain of Drug should go in this
+    table. When the Drug Source Value of the code cannot be translated into Standard Drug Concept IDs,
+    a Drug exposure entry is stored with only the corresponding SOURCE_CONCEPT_ID and DRUG_SOURCE_VALUE
+    and a DRUG_CONCEPT_ID of 0. The Drug Concept with the most detailed content of information is preferred
+    during the mapping process. These are indicated in the CONCEPT_CLASS_ID field of the Concept and are
+    recorded in the following order of precedence: Marketed Product, Branded Pack, Clinical Pack, Branded
+    Drug, Clinical Drug, Branded Drug Component, Clinical Drug Component, Branded Drug Form, Clinical
+    Drug Form, and only if no other information is available Ingredient. Note: If only the drug class
+    is known, the DRUG_CONCEPT_ID field should contain 0. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Drug&standardConcept=Standard&page=1&pageSize=15&query=).
+- name: drug_exposure_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    Use this date to determine the start date of the drug record.
+  etl_convention: >-
+    Valid entries include a start date of a prescription, the date a prescription was filled, or the date
+    on which a Drug administration was recorded. It is a valid ETL choice to use the date the drug was
+    ordered as the DRUG_EXPOSURE_START_DATE.
+- name: drug_exposure_start_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This is not required, though it is in v6. If a source does not specify datetime the convention is
+    to set the time to midnight (00:00:0000)
+- name: drug_exposure_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The DRUG_EXPOSURE_END_DATE denotes the day the drug exposure ended for the patient.
+  etl_convention: >-
+    If this information is not explicitly available in the data, infer the end date from start date and
+    duration.
+
+
+    For detailed conventions for how to populate this field, please see the [THEMIS repository](https://ohdsi.github.io/Themis/tag_drug_exposure.html).
+- name: drug_exposure_end_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This is not required, though it is in v6. If a source does not specify datetime the convention is
+    to set the time to midnight (00:00:0000)
+- name: verbatim_end_date
+  data_type: date
+  required: false
+  primary_key: false
+  description: >-
+    This is the end date of the drug exposure as it appears in the source data, if it is given
+  etl_convention: >-
+    Put the end date or discontinuation date as it appears from the source data or leave blank if unavailable.
+- name: drug_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    You can use the TYPE_CONCEPT_ID to delineate between prescriptions written vs. prescriptions dispensed
+    vs. medication history vs. patient-reported exposure, etc.
+  etl_convention: >-
+    Choose the drug_type_concept_id that best represents the provenance of the record, for example whether
+    it came from a record of a prescription written or physician administered drug. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: stop_reason
+  data_type: varchar(20)
+  required: false
+  primary_key: false
+  description: >-
+    The reason a person stopped a medication as it is represented in the source. Reasons include regimen
+    completed, changed, removed, etc. This field will be retired in v6.0.
+  etl_convention: >-
+    This information is often not populated in source data and it is a valid etl choice to leave it blank
+    if the information does not exist.
+- name: refills
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    This is only filled in when the record is coming from a prescription written this field is meant to
+    represent intended refills at time of the prescription.
+  etl_convention: ""
+- name: quantity
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    To find the dose form of a drug the RELATIONSHIP table can be used where the relationship_id is 'Has
+    dose form'. If liquid, quantity stands for the total amount dispensed or ordered of ingredient in
+    the units given by the drug_strength table. If the unit from the source data does not align with the
+    unit in the DRUG_STRENGTH table the quantity should be converted to the correct unit given in DRUG_STRENGTH.
+    For clinical drugs with fixed dose forms (tablets etc.) the quantity is the number of units/tablets/capsules
+    prescribed or dispensed (can be partial, but then only 1/2 or 1/3, not 0.01). Clinical drugs with
+    divisible dose forms (injections) the quantity is the amount of ingredient the patient got. For example,
+    if the injection is 2mg/mL but the patient got 80mL then quantity is reported as 160.
+
+    Quantified clinical drugs with divisible dose forms (prefilled syringes), the quantity is the amount
+    of ingredient similar to clinical drugs. Please see [how to calculate drug dose](https://ohdsi.github.io/CommonDataModel/drug_dose.html)
+    for more information.
+- name: days_supply
+  data_type: integer
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    The number of days of supply of the medication as recorded in the original prescription or dispensing
+    record. Days supply can differ from actual drug duration (i.e. prescribed days supply vs actual exposure).","The
+    field should be left empty if the source data does not contain a verbatim days_supply, and should
+    not be calculated from other fields.
+
+
+    Negative values are not allowed. If the source has negative days supply the record should be dropped
+    as it is unknown if the patient actually took the drug. Several actions are possible: 1) record is
+    not trustworthy and we remove the record entirely. 2) we trust the record and leave days_supply empty
+    or 3) record needs to be combined with other record (e.g. reversal of prescription). High values (>365
+    days) should be investigated. If considered an error in the source data (e.g. typo), the value needs
+    to be excluded to prevent creation of unrealistic long eras.
+- name: sig
+  data_type: varchar
+  required: false
+  primary_key: false
+  description: >-
+    This is the verbatim instruction for the drug as written by the provider.
+  etl_convention: >-
+    Put the written out instructions for the drug as it is verbatim in the source, if available.
+- name: route_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Route
+  description: ""
+  etl_convention: >-
+    The standard CONCEPT_ID that the ROUTE_SOURCE_VALUE maps to in the route domain. This is meant to
+    represent the route of administration of the drug. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Route&standardConcept=Standard&page=1&pageSize=15&query=)
+- name: lot_number
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    The Provider associated with drug record, e.g. the provider who wrote the prescription or the provider
+    who administered the drug.
+  etl_convention: >-
+    The ETL may need to make a choice as to which PROVIDER_ID to put here. Based on what is available
+    this may or may not be different than the provider associated with the overall VISIT_OCCURRENCE record,
+    for example the ordering vs administering physician on an EHR record.
+- name: visit_occurrence_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_occurrence
+    field: visit_occurrence_id
+  description: >-
+    The Visit during which the drug was prescribed, administered or dispensed.
+  etl_convention: >-
+    To populate this field drug exposures must be explicitly initiated in the visit.
+- name: visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    The VISIT_DETAIL record during which the drug exposure occurred. For example, if the person was in
+    the ICU at the time of the drug administration the VISIT_OCCURRENCE record would reflect the overall
+    hospital stay and the VISIT_DETAIL record would reflect the ICU stay during the hospital visit.
+  etl_convention: >-
+    Same rules apply as for the VISIT_OCCURRENCE_ID.
+- name: drug_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the drug exposure that occurred.
+    For example, this could be an NDC or Gemscript code.
+  etl_convention: >-
+    This code is mapped to a Standard Drug Concept in the Standardized Vocabularies and the original code
+    is stored here for reference.
+- name: drug_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the concept representing the drug source value and may not necessarily be standard. This field
+    is discouraged from use in analysis because it is not required to contain Standard Concepts that are
+    used across the OHDSI community, and should only be used when Standard Concepts do not adequately
+    represent the source detail for the Drug necessary for a given analytic use case. Consider using DRUG_CONCEPT_ID
+    instead to enable standardized analytics that can be consistent across the network.
+  etl_convention: >-
+    If the DRUG_SOURCE_VALUE is coded in the source data using an OMOP supported vocabulary put the concept
+    id representing the source value here.
+- name: route_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the drug route.
+  etl_convention: >-
+    This information may be called something different in the source data but the field is meant to contain
+    a value indicating when and how a drug was given to a patient. This source value is mapped to a standard
+    concept which is stored in the ROUTE_CONCEPT_ID field.
+- name: dose_unit_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the dose unit of the drug given.
+  etl_convention: >-
+    This information may be called something different in the source data but the field is meant to contain
+    a value indicating the unit of dosage of drug given to the patient. **This is an older column and
+    will be deprecated in an upcoming version.**

@@ -19,7 +19,7 @@ from pydantic import (
     model_validator,
 )
 
-from .contracts import AgentConfig
+from .contracts import AgentConfig, TargetSchemaDocument
 from .loop import run_agent_with_specs
 from .preflight import build_generation_preflight
 from .provider_errors import api_error_message
@@ -124,6 +124,63 @@ class ValidationResponse(StrictApiModel):
     source_models: list[str] = Field(default_factory=list)
     target_field_count: int | None = None
     pending_reviews: list[str] = Field(default_factory=list)
+
+
+class TargetSchemaSummaryResponse(StrictApiModel):
+    """Read-only summary of one agent-owned OMOP target table."""
+
+    target_table: str
+    cdm_schema: Literal["CDM", "VOCAB", "RESULTS"]
+    cdm_version: str
+    required: bool
+    description: str
+    field_count: int
+
+
+class TargetSchemaCatalogResponse(StrictApiModel):
+    """Read-only index of the complete agent-owned OMOP catalog."""
+
+    cdm_version: str
+    table_count: int
+    field_count: int
+    tables: list[TargetSchemaSummaryResponse]
+
+
+class TargetForeignKeyResponse(StrictApiModel):
+    """Foreign-key information suitable for tabular UI display."""
+
+    table: str
+    field: str | None = None
+    domain: str | None = None
+    class_name: str | None = None
+
+
+class TargetFieldResponse(StrictApiModel):
+    """One field in a read-only OMOP target-schema response."""
+
+    name: str
+    data_type: str
+    required: bool
+    primary_key: bool
+    foreign_key: TargetForeignKeyResponse | None = None
+    description: str
+    etl_convention: str
+
+
+class TargetSchemaResponse(StrictApiModel):
+    """Complete validated target metadata without exposing YAML."""
+
+    cdm_version: str
+    target_table: str
+    cdm_schema: Literal["CDM", "VOCAB", "RESULTS"]
+    required: bool
+    concept_prefix: str | None = None
+    measure_person_completeness: bool
+    measure_person_completeness_threshold: float | None = None
+    description: str
+    user_guidance: str
+    etl_convention: str
+    fields: list[TargetFieldResponse]
 
 
 class ProjectGenerationSettings(StrictApiModel):
@@ -311,6 +368,100 @@ def require_api_token(
 def health() -> dict[str, str]:
     """Expose a non-sensitive liveness endpoint."""
     return {"service": "cardiac-ai-omop-agent", "status": "ok"}
+
+
+def _read_target_schema(path: Path) -> TargetSchemaDocument:
+    """Load and validate one agent-owned target file."""
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        target_schema = TargetSchemaDocument.model_validate(document)
+    except (OSError, ValidationError, yaml.YAMLError) as error:
+        raise RuntimeError("Target schema catalog is unavailable.") from error
+
+    if target_schema.target_table != path.stem:
+        raise RuntimeError("Target schema catalog is unavailable.")
+    return target_schema
+
+
+def _target_schema_response(
+    target_schema: TargetSchemaDocument,
+) -> TargetSchemaResponse:
+    """Convert an internal contract into the stable read-only API shape."""
+    return TargetSchemaResponse.model_validate(
+        target_schema.model_dump(exclude={"version"})
+    )
+
+
+@app.get(
+    "/v1/target-schemas",
+    response_model=TargetSchemaCatalogResponse,
+    dependencies=[Depends(require_api_token)],
+)
+def target_schema_catalog() -> TargetSchemaCatalogResponse:
+    """List validated OMOP target tables without returning raw YAML."""
+    paths = sorted(TARGET_SCHEMA_DIR.glob("*.yml"))
+    if not paths:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Target schema catalog is unavailable.",
+        )
+
+    try:
+        schemas = [_read_target_schema(path) for path in paths]
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    cdm_versions = {schema.cdm_version for schema in schemas}
+    if len(cdm_versions) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Target schema catalog is unavailable.",
+        )
+
+    tables = [
+        TargetSchemaSummaryResponse(
+            target_table=schema.target_table,
+            cdm_schema=schema.cdm_schema,
+            cdm_version=schema.cdm_version,
+            required=schema.required,
+            description=schema.description,
+            field_count=len(schema.fields),
+        )
+        for schema in schemas
+    ]
+    return TargetSchemaCatalogResponse(
+        cdm_version=next(iter(cdm_versions)),
+        table_count=len(tables),
+        field_count=sum(table.field_count for table in tables),
+        tables=tables,
+    )
+
+
+@app.get(
+    "/v1/target-schemas/{omop_table}",
+    response_model=TargetSchemaResponse,
+    dependencies=[Depends(require_api_token)],
+)
+def target_schema(omop_table: OmopTable) -> TargetSchemaResponse:
+    """Return one validated OMOP target table as structured JSON."""
+    path = TARGET_SCHEMA_DIR / f"{omop_table}.yml"
+    if not path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target schema was not found.",
+        )
+
+    try:
+        document = _read_target_schema(path)
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+    return _target_schema_response(document)
 
 
 def _validate_request_specifications(

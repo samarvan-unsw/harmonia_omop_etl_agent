@@ -1,0 +1,145 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: specimen
+cdm_schema: CDM
+required: false
+concept_prefix: SPECIMEN_
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  The specimen domain contains the records identifying biological samples from a person.
+user_guidance: ""
+etl_convention: >-
+  Anatomic site is coded at the most specific level of granularity possible, such that higher level classifications
+  can be derived using the Standardized Vocabularies.
+fields:
+- name: specimen_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    Unique identifier for each specimen.
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The person from whom the specimen is collected.
+  etl_convention: ""
+- name: specimen_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    The standard CONCEPT_ID that the SPECIMEN_SOURCE_VALUE maps to in the specimen domain. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Specimen&standardConcept=Standard&page=1&pageSize=15&query=)
+- name: specimen_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: ""
+  etl_convention: >-
+    Put the source of the specimen record, as in an EHR system. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?standardConcept=Standard&domain=Type+Concept&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: specimen_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date the specimen was collected.
+  etl_convention: ""
+- name: specimen_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: quantity
+  data_type: float
+  required: false
+  primary_key: false
+  description: >-
+    The amount of specimen collected from the person.
+  etl_convention: ""
+- name: unit_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    The unit for the quantity of the specimen.
+  etl_convention: >-
+    Map the UNIT_SOURCE_VALUE to a Standard Concept in the Unit domain. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Unit&standardConcept=Standard&page=1&pageSize=15&query=).
+    If the source unit is NULL (applicable to cases when there's no numerical value or when it doesn't
+    require a unit), keep unit_concept_id NULL as well. If there's no mapping of a source unit, populate
+    unit_concept_id with 0.
+- name: anatomic_site_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the site on the body where the specimen is from.
+  etl_convention: >-
+    Map the ANATOMIC_SITE_SOURCE_VALUE to a Standard Concept in the Spec Anatomic Site domain. This should
+    be coded at the lowest level of granularity [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?standardConcept=Standard&domain=Spec+Anatomic+Site&conceptClass=Body+Structure&page=4&pageSize=15&query=)
+- name: disease_status_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: specimen_source_id
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This is the identifier for the specimen from the source system.
+  etl_convention: ""
+- name: specimen_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: unit_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This unit for the quantity of the specimen, as represented in the source.
+- name: anatomic_site_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This is the site on the body where the specimen was taken from, as represented in the source.
+- name: disease_status_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""

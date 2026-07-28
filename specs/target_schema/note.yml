@@ -1,0 +1,203 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: note
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  The NOTE table captures unstructured information that was recorded by a provider about a patient in
+  free text (in ASCII, or preferably in UTF8 format) notes on a given date. The type of note_text is CLOB
+  or varchar(MAX) depending on RDBMS.
+user_guidance: ""
+etl_convention: >-
+  HL7/LOINC CDO is a standard for consistent naming of documents to support a range of use cases: retrieval,
+  organization, display, and exchange. It guides the creation of LOINC codes for clinical notes. CDO annotates
+  each document with 5 dimensions:
+
+
+  - **Kind of Document**: Characterizes the general structure of the document at a macro level (e.g. Anesthesia
+  Consent)
+
+  - **Type of Service**: Characterizes the kind of service or activity (e.g. evaluations, consultations,
+  and summaries). The notion of time sequence, e.g., at the beginning (admission) at the end (discharge)
+  is subsumed in this axis. Example: Discharge Teaching.
+
+  - **Setting**: Setting is an extension of CMS's definitions (e.g. Inpatient, Outpatient)
+
+  - **Subject Matter Domain (SMD)**: Characterizes the subject matter domain of a note (e.g. Anesthesiology)
+
+  - **Role**: Characterizes the training or professional level of the author of the document, but does
+  not break down to specialty or subspecialty (e.g. Physician)
+
+  Each combination of these 5 dimensions rolls up to a unique LOINC code.
+
+
+  According to CDO requirements, only 2 of the 5 dimensions are required to properly annotate a document;
+  Kind of Document and any one of the other 4 dimensions.
+
+  However, not all the permutations of the CDO dimensions will necessarily yield an existing LOINC code.
+  Each of these dimensions are contained in the OMOP Vocabulary under the domain of 'Meas Value' with
+  each dimension represented as a Concept Class.
+fields:
+- name: note_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    A unique identifier for each note.
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: note_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date the note was recorded.
+  etl_convention: ""
+- name: note_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If time is not given set the time to midnight.
+- name: note_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    The provenance of the note. Most likely this will be EHR.
+  etl_convention: >-
+    Put the source system of the note, as in EHR record. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?standardConcept=Standard&domain=Type+Concept&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: note_class_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    A Standard Concept Id representing the HL7 LOINC
+
+    Document Type Vocabulary classification of the note.
+  etl_convention: >-
+    Map the note classification to a Standard Concept. For more information see the ETL Conventions in
+    the description of the NOTE table. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?standardConcept=Standard&conceptClass=Doc+Kind&conceptClass=Doc+Role&conceptClass=Doc+Setting&conceptClass=Doc+Subject+Matter&conceptClass=Doc+Type+of+Service&domain=Meas+Value&page=1&pageSize=15&query=).
+    This Concept can alternatively be represented by concepts with the relationship 'Kind of (LOINC)'
+    to [706391](https://athena.ohdsi.org/search-terms/terms/706391) (Note).
+- name: note_title
+  data_type: varchar(250)
+  required: false
+  primary_key: false
+  description: >-
+    The title of the note.
+  etl_convention: ""
+- name: note_text
+  data_type: varchar
+  required: true
+  primary_key: false
+  description: >-
+    The content of the note.
+  etl_convention: ""
+- name: encoding_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the Concept representing the character encoding type.
+  etl_convention: >-
+    Put the Concept Id that represents the encoding character type here. Currently the only option is
+    UTF-8 ([32678](https://athena.ohdsi.org/search-terms/terms/32678)). It the note is encoded in any
+    other type, like ASCII then put 0.
+- name: language_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    The language of the note.
+  etl_convention: >-
+    Use Concepts that are descendants of the concept [4182347](https://athena.ohdsi.org/search-terms/terms/4182347)
+    (World Languages).
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    The Provider who wrote the note.
+  etl_convention: >-
+    The ETL may need to make a determination on which provider to put here.
+- name: visit_occurrence_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_occurrence
+    field: visit_occurrence_id
+  description: >-
+    The Visit during which the note was written.
+  etl_convention: ""
+- name: visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    The Visit Detail during which the note was written.
+  etl_convention: ""
+- name: note_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    The source value mapped to the NOTE_CLASS_CONCEPT_ID.
+- name: note_event_id
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    If the Note record is related to another record in the database, this field is the primary key of
+    the linked record.
+  etl_convention: >-
+    Put the primary key of the linked record, if applicable, here.
+- name: note_event_field_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    If the Note record is related to another record in the database, this field is the CONCEPT_ID that
+    identifies which table the primary key of the linked record came from.
+  etl_convention: >-
+    Put the CONCEPT_ID that identifies which table and field the NOTE_EVENT_ID came from.

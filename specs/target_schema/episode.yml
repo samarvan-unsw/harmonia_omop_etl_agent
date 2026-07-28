@@ -1,0 +1,155 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: episode
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The EPISODE table aggregates lower-level clinical events (VISIT_OCCURRENCE, DRUG_EXPOSURE, PROCEDURE_OCCURRENCE,
+  DEVICE_EXPOSURE) into a higher-level abstraction representing clinically and analytically relevant disease
+  phases,outcomes and treatments. The EPISODE_EVENT table connects qualifying clinical events (VISIT_OCCURRENCE,
+  DRUG_EXPOSURE, PROCEDURE_OCCURRENCE, DEVICE_EXPOSURE) to the appropriate EPISODE entry. For example
+  cancers including their development over time, their treatment, and final resolution.
+user_guidance: >-
+  Valid Episode Concepts belong to the 'Episode' domain. For cancer episodes please see [article], for
+  non-cancer episodes please see [article]. If your source data does not have all episodes that are relevant
+  to the therapeutic area, write only those you can easily derive from the data. It is understood that
+  that table is not currently expected to be comprehensive.
+etl_convention: ""
+fields:
+- name: episode_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    A unique identifier for each Episode.
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The PERSON_ID of the PERSON for whom the episode is recorded.
+  etl_convention: ""
+- name: episode_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Episode
+  description: >-
+    The EPISODE_CONCEPT_ID represents the kind abstraction related to the disease phase, outcome or treatment.
+  etl_convention: >-
+    Choose a concept in the Episode domain that best represents the ongoing disease phase, outcome, or
+    treatment. Please see [article] for cancers and [article] for non-cancers describing how these are
+    defined. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Episode&page=1&pageSize=15&query=)
+- name: episode_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date when the Episode beings.
+  etl_convention: >-
+    Please see [article] for how to define an Episode start date.
+- name: episode_start_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: >-
+    The date and time when the Episode begins.
+  etl_convention: ""
+- name: episode_end_date
+  data_type: date
+  required: false
+  primary_key: false
+  description: >-
+    The date when the instance of the Episode is considered to have ended.
+  etl_convention: >-
+    Please see [article] for how to define an Episode end date.
+- name: episode_end_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: >-
+    The date when the instance of the Episode is considered to have ended.
+  etl_convention: ""
+- name: episode_parent_id
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    Use this field to find the Episode that subsumes the given Episode record. This is used in the case
+    that an Episode are nested into each other.
+  etl_convention: >-
+    If there are multiple nested levels to how Episodes are represented, the EPISODE_PARENT_ID can be
+    used to record this relationship.
+- name: episode_number
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    For sequences of episodes, this is used to indicate the order the episodes occurred. For example,
+    lines of treatment could be indicated here.
+  etl_convention: >-
+    Please see [article] for the details of how to count episodes.
+- name: episode_object_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Procedure, Regimen
+  description: >-
+    A Standard Concept representing the disease phase, outcome, or other abstraction of which the episode
+    consists. For example, if the EPISODE_CONCEPT_ID is [treatment regimen](https://athena.ohdsi.org/search-terms/terms/32531)
+    then the EPISODE_OBJECT_CONCEPT_ID should contain the chemotherapy regimen concept, like [Afatinib
+    monotherapy](https://athena.ohdsi.org/search-terms/terms/35804392).
+  etl_convention: >-
+    Episode entries from the 'Disease Episode' concept class should have an episode_object_concept_id
+    that comes from the Condition domain. Episode entries from the 'Treatment Episode' concept class should
+    have an episode_object_concept_id that scome from the 'Procedure' domain or 'Regimen' concept class.
+- name: episode_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    This field can be used to determine the provenance of the Episode record, as in whether the episode
+    was from an EHR system, insurance claim, registry, or other sources.
+  etl_convention: >-
+    Choose the EPISODE_TYPE_CONCEPT_ID that best represents the provenance of the record. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: episode_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    The source code for the Episode as it appears in the source data. This code is mapped to a Standard
+    Condition Concept in the Standardized Vocabularies and the original code is stored here for reference.
+  etl_convention: ""
+- name: episode_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    A foreign key to a Episode Concept that refers to the code used in the source.
+  etl_convention: >-
+    Given that the Episodes are user-defined it is unlikely that there will be a Source Concept available.
+    If that is the case then set this field to zero.

@@ -1,0 +1,90 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: death
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The death domain contains the clinical event for how and when a Person dies. A person can have up to
+  one record if the source system contains evidence about the Death, such as: Condition in an administrative
+  claim, status of enrollment into a health plan, or explicit record in EHR data.
+user_guidance: ""
+etl_convention: >-
+  For specific conventions on how to populate this table, please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/death.html).
+fields:
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: death_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date the person was deceased.
+  etl_convention: >-
+    If the precise date include day or month is not known or not allowed, December is used as the default
+    month, and the last day of the month the default day. For additional conventions related to this field,
+    please refer to the [THEMIS repository](https://ohdsi.github.io/Themis/tag_death_date.html).
+- name: death_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If you have date and time of death, populate death_datetime, otherwise leave NULL
+- name: death_type_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    This is the provenance of the death record, i.e., where it came from. It is possible that an administrative
+    claims database would source death information from a government file so do not assume the Death Type
+    is the same as the Visit Type, etc.
+  etl_convention: >-
+    Use the type concept that reflects the source of the death record. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: cause_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the Standard Concept representing the Person's cause of death, if available.
+  etl_convention: >-
+    There is no specified domain for this concept, just choose the Standard Concept Id that best represents
+    the person's cause of death.
+- name: cause_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If available, put the source code representing the cause of death here.
+- name: cause_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    If the cause of death was coded using a Vocabulary present in the OMOP Vocabularies (not necessarily
+    a standard concept) put the CONCEPT_ID representing the cause of death here.

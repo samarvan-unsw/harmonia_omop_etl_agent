@@ -22,6 +22,11 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         ).read_text(encoding="utf-8")
         mapping = yaml.safe_load(mapping_content)
         for field_mapping in mapping["fields"]:
+            # Keep review-gate tests deterministic even when the maintained
+            # project mapping has already been approved by a user.
+            if field_mapping["target_field"] == "race_concept_id":
+                field_mapping["review_required"] = True
+                field_mapping["review_status"] = "pending"
             if (
                 field_mapping.get("review_required")
                 and not field_mapping.get("review_comment")
@@ -75,6 +80,81 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+
+    async def test_target_catalog_requires_bearer_token(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get("/v1/target-schemas")
+
+        self.assertEqual(response.status_code, 401)
+
+    async def test_lists_complete_target_catalog_as_json(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/target-schemas",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["cdm_version"], "5.4")
+        self.assertEqual(result["table_count"], 39)
+        self.assertEqual(result["field_count"], 432)
+        self.assertEqual(len(result["tables"]), 39)
+        person = next(
+            table
+            for table in result["tables"]
+            if table["target_table"] == "person"
+        )
+        self.assertEqual(person["field_count"], 18)
+        self.assertEqual(person["cdm_schema"], "CDM")
+
+    async def test_returns_structured_target_schema_details(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/target-schemas/person",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["target_table"], "person")
+        self.assertEqual(len(result["fields"]), 18)
+        gender_concept = next(
+            field
+            for field in result["fields"]
+            if field["name"] == "gender_concept_id"
+        )
+        self.assertEqual(
+            gender_concept["foreign_key"],
+            {
+                "table": "concept",
+                "field": "concept_id",
+                "domain": "Gender",
+                "class_name": None,
+            },
+        )
+        self.assertNotIn("version", result)
+
+    async def test_unknown_target_schema_returns_not_found(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/target-schemas/not_a_table",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 404)
 
     async def test_validation_requires_bearer_token(self):
         with patch.dict(

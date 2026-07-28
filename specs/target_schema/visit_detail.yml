@@ -1,0 +1,280 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: visit_detail
+cdm_schema: CDM
+required: false
+concept_prefix: VISIT_DETAIL_
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  The VISIT_DETAIL table is an optional table used to represents details of each record in the parent
+  VISIT_OCCURRENCE table. A good example of this would be the movement between units in a hospital during
+  an inpatient stay or claim lines associated with a one insurance claim. For every record in the VISIT_OCCURRENCE
+  table there may be 0 or more records in the VISIT_DETAIL table with a 1:n relationship where n may be
+  0. The VISIT_DETAIL table is structurally very similar to VISIT_OCCURRENCE table and belongs to the
+  visit domain.
+user_guidance: >-
+  The configuration defining the Visit Detail is described by Concepts in the Visit Domain, which form
+  a hierarchical structure. The Visit Detail record will have an associated to the Visit Occurrence record
+  in two ways:
+
+
+  1. The Visit Detail record will have the VISIT_OCCURRENCE_ID it is associated to 2. The VISIT_DETAIL_CONCEPT_ID
+  will be a descendant of the VISIT_CONCEPT_ID for the Visit.
+etl_convention: >-
+  It is not mandatory that the VISIT_DETAIL table be filled in, but if you find that the logic to create
+  VISIT_OCCURRENCE records includes the roll-up of multiple smaller records to create one picture of a
+  Visit then it is a good idea to use VISIT_DETAIL. In EHR data, for example, a Person may be in the hospital
+  but instead of one over-arching Visit their encounters are recorded as times they interacted with a
+  health care provider. A Person in the hospital interacts with multiple providers multiple times a day
+  so the encounters must be strung together using some heuristic (defined by the ETL) to identify the
+  entire Visit. In this case the encounters would be considered Visit Details and the entire Visit would
+  be the Visit Occurrence. In this example it is also possible to use the Vocabulary to distinguish Visit
+  Details from a Visit Occurrence by setting the VISIT_CONCEPT_ID to [9201](https://athena.ohdsi.org/search-terms/terms/9201)
+  and the VISIT_DETAIL_CONCEPT_IDs either to 9201 or its children to indicate where the patient was in
+  the hospital at the time of care.
+fields:
+- name: visit_detail_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    Use this to identify unique interactions between a person and the health care system. This identifier
+    links across the other CDM event tables to associate events with a visit detail.
+  etl_convention: >-
+    This should be populated by creating a unique identifier for each unique interaction between a person
+    and the healthcare system where the person receives a medical good or service over a span of time.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: visit_detail_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Visit
+  description: >-
+    This field contains a concept id representing the kind of visit detail, like inpatient or outpatient.
+    All concepts in this field should be standard and belong to the Visit domain.
+  etl_convention: >-
+    Populate this field based on the kind of visit that took place for the person. For example this could
+    be "Inpatient Visit", "Outpatient Visit", "Ambulatory Visit", etc. This table will contain standard
+    concepts in the Visit domain. These concepts are arranged in a hierarchical structure to facilitate
+    cohort definitions by rolling up to generally familiar Visits adopted in most healthcare systems worldwide.
+    [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Visit&standardConcept=Standard&page=1&pageSize=15&query=).
+- name: visit_detail_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    This is the date of the start of the encounter. This may or may not be equal to the date of the Visit
+    the Visit Detail is associated with.
+  etl_convention: >-
+    When populating VISIT_DETAIL_START_DATE, you should think about the patient experience to make decisions
+    on how to define visits. Most likely this should be the date of the patient-provider interaction.
+- name: visit_detail_start_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If no time is given for the start date of a visit, set it to midnight (00:00:0000).
+- name: visit_detail_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    This the end date of the patient-provider interaction. If a Person is still an inpatient in the hospital
+    at the time of the data extract and does not have a visit_end_date, then set the visit_end_date to
+    the date of the data pull.
+  etl_convention: >-
+    Visit Detail end dates are mandatory. If end dates are not provided in the source there are three
+    ways in which to derive them:
+
+
+    - Outpatient Visit Detail: visit_detail_end_datetime = visit_detail_start_datetime
+
+    - Emergency Room Visit Detail: visit_detail_end_datetime = visit_detail_start_datetime
+
+    - Inpatient Visit Detail: Usually there is information about discharge. If not, you should be able
+    to derive the end date from the sudden decline of activity or from the absence of inpatient procedures/drugs.
+
+    - Non-hospital institution Visit Details: Particularly for claims data, if end dates are not provided
+    assume the visit is for the duration of month that it occurs.
+
+
+    For Inpatient Visit Details ongoing at the date of ETL, put date of processing the data into visit_detai_end_datetime
+    and visit_detail_type_concept_id with 32220 "Still patient" to identify the visit as incomplete.
+
+    All other Visits Details: visit_detail_end_datetime = visit_detail_start_datetime.
+- name: visit_detail_end_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: >-
+    If a Person is still an inpatient in the hospital at the time of the data extract and does not have
+    a visit_end_datetime, then set the visit_end_datetime to the datetime of the data pull.
+  etl_convention: >-
+    If no time is given for the end date of a visit, set it to midnight (00:00:0000).
+- name: visit_detail_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    Use this field to understand the provenance of the visit detail record, or where the record comes
+    from.
+  etl_convention: >-
+    Populate this field based on the provenance of the visit detail record, as in whether it came from
+    an EHR record or billing claim. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    There will only be one provider per **visit** record and the ETL document should clearly state how
+    they were chosen (attending, admitting, etc.). This is a typical reason for leveraging the VISIT_DETAIL
+    table as even though each VISIT_DETAIL record can only have one provider, there is no limit to the
+    number of VISIT_DETAIL records that can be associated to a VISIT_OCCURRENCE record.
+  etl_convention: >-
+    The additional providers associated to a Visit can be stored in this table where each VISIT_DETAIL
+    record represents a different provider.
+- name: care_site_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: care_site
+    field: care_site_id
+  description: >-
+    This field provides information about the Care Site where the Visit Detail took place.
+  etl_convention: >-
+    There should only be one Care Site associated with a Visit Detail.
+- name: visit_detail_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the kind of visit detail that
+    took place (inpatient, outpatient, emergency, etc.)
+  etl_convention: >-
+    If there is information about the kind of visit detail in the source data that value should be stored
+    here. If a visit is an amalgamation of visits from the source then use a hierarchy to choose the VISIT_DETAIL_SOURCE_VALUE,
+    such as IP -> ER-> OP. This should line up with the logic chosen to determine how visits are created.
+- name: visit_detail_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    If the VISIT_DETAIL_SOURCE_VALUE is coded in the source data using an OMOP supported vocabulary put
+    the concept id representing the source value here.
+- name: admitted_from_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Visit
+  description: >-
+    Use this field to determine where the patient was admitted from. This concept is part of the visit
+    domain and can indicate if a patient was admitted to the hospital from a long-term care facility,
+    for example.
+  etl_convention: >-
+    If available, map the admitted_from_source_value to a standard concept in the visit domain. [Accepted
+    Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Visit&standardConcept=Standard&page=1&pageSize=15&query=).
+    If a person was admitted from home or was self-referred, set this to 0.
+- name: admitted_from_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This information may be called something different in the source data but the field is meant to contain
+    a value indicating where a person was admitted from. Typically this applies only to visits that have
+    a length of stay, like inpatient visits or long-term care visits.
+- name: discharged_to_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This information may be called something different in the source data but the field is meant to contain
+    a value indicating where a person was discharged to after a visit, as in they went home or were moved
+    to long-term care. Typically this applies only to visits that have a length of stay of a day or more.
+- name: discharged_to_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Visit
+  description: >-
+    Use this field to determine where the patient was discharged to after a visit. This concept is part
+    of the visit domain and can indicate if a patient was transferred to another hospital or sent to a
+    long-term care facility, for example. It is assumed that a person is discharged to home therefore
+    there is not a standard concept id for "home". Use concept id = 0 when a person is discharged to home.
+  etl_convention: >-
+    If available, map the DISCHARGE_TO_SOURCE_VALUE to a Standard Concept in the Visit domain. [Accepted
+    Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Visit&standardConcept=Standard&page=1&pageSize=15&query=).
+- name: preceding_visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    Use this field to find the visit detail that occurred for the person prior to the given visit detail
+    record. There could be a few days or a few years in between.
+  etl_convention: >-
+    The PRECEDING_VISIT_DETAIL_ID can be used to link a visit immediately preceding the current Visit
+    Detail. Note this is not symmetrical, and there is no such thing as a "following_visit_id".
+- name: parent_visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    Use this field to find the visit detail that subsumes the given visit detail record. This is used
+    in the case that a visit detail record needs to be nested beyond the VISIT_OCCURRENCE/VISIT_DETAIL
+    relationship.
+  etl_convention: >-
+    If there are multiple nested levels to how Visits are represented in the source, the VISIT_DETAIL_PARENT_ID
+    can be used to record this relationship.
+- name: visit_occurrence_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: visit_occurrence
+    field: visit_occurrence_id
+  description: >-
+    Use this field to link the VISIT_DETAIL record to its VISIT_OCCURRENCE.
+  etl_convention: >-
+    Put the VISIT_OCCURRENCE_ID that subsumes the VISIT_DETAIL record here.

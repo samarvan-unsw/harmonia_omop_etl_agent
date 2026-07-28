@@ -1,0 +1,46 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: concept_synonym
+cdm_schema: VOCAB
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The CONCEPT_SYNONYM table captures alternative terms, synonyms, and translations of Concept Name into
+  various languages linked to specific concepts, providing users with a comprehensive view of how Concepts
+  may be expressed or referenced.
+user_guidance: >-
+  Users can leverage the CONCEPT_SYNONYM table to expand search capabilities and improve query accuracy
+  by incorporating synonymous terms into data analysis and retrieval processes. Also, users can enhance
+  their mapping efforts between local terminologies and standardized concepts by identifying synonymous
+  terms associated with concepts in the CONCEPT_SYNONYM table.
+etl_convention: ""
+fields:
+- name: concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: concept_synonym_name
+  data_type: varchar(1000)
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: language_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""

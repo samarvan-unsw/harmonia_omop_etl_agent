@@ -1,0 +1,96 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: drug_era
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  A Drug Era is defined as a span of time when the Person is assumed to be exposed to a particular active
+  ingredient. A Drug Era is not the same as a Drug Exposure: Exposures are individual records corresponding
+  to the source when Drug was delivered to the Person, while successive periods of Drug Exposures are
+  combined under certain rules to produce continuous Drug Eras. Every record in the DRUG_EXPOSURE table
+  should be part of a drug era based on the dates of exposure.
+user_guidance: ""
+etl_convention: >-
+  The SQL script for generating DRUG_ERA records can be found [here](https://ohdsi.github.io/CommonDataModel/sqlScripts.html#drug_eras).
+fields:
+- name: drug_era_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: ""
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: drug_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Drug
+    class_name: Ingredient
+  description: >-
+    The drug_concept_id should conform to the concept class 'ingredient' as the drug_era is an era of
+    time where a person is exposed to a particular drug ingredient.
+  etl_convention: ""
+- name: drug_era_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    The Drug Era Start Date is the start date of the first Drug Exposure for a given ingredient, with
+    at least 31 days since the previous exposure.
+- name: drug_era_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    The Drug Era End Date is the end date of the last Drug Exposure. The End Date of each Drug Exposure
+    is either taken from the field drug_exposure_end_date or, as it is typically not available, inferred
+    using the following rules:
+
+    For pharmacy prescription data, the date when the drug was dispensed plus the number of days of supply
+    are used to extrapolate the End Date for the Drug Exposure. Depending on the country-specific healthcare
+    system, this supply information is either explicitly provided in the day_supply field or inferred
+    from package size or similar information.
+
+    For Procedure Drugs, usually the drug is administered on a single date (i.e., the administration date).
+
+    A standard Persistence Window of 30 days (gap, slack) is permitted between two subsequent such extrapolated
+    DRUG_EXPOSURE records to be considered to be merged into a single Drug Era.
+- name: drug_exposure_count
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    The count of grouped DRUG_EXPOSURE records that were included in the DRUG_ERA row
+  etl_convention: ""
+- name: gap_days
+  data_type: integer
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    The Gap Days determine how many total drug-free days are observed between all Drug Exposure events
+    that contribute to a DRUG_ERA record. It is assumed that the drugs are "not stockpiled" by the patient,
+    i.e. that if a new drug prescription or refill is observed (a new DRUG_EXPOSURE record is written),
+    the remaining supply from the previous events is abandoned. The difference between Persistence Window
+    and Gap Days is that the former is the maximum drug-free time allowed between two subsequent DRUG_EXPOSURE
+    records, while the latter is the sum of actual drug-free days for the given Drug Era under the above
+    assumption of non-stockpiling.

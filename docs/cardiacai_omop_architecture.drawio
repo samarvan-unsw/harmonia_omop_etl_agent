@@ -1,0 +1,111 @@
+<mxfile host="65bd71144e">
+    <diagram id="cardiacai-omop-architecture" name="Architecture">
+        <mxGraphModel dx="2101" dy="977" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="CardiacAI OMOP Agent Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=26;fontStyle=1;fontColor=#172B4D;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="35" width="620" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" value="Deployment, runtime flow and configuration ownership" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#5E6C84;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="73" width="520" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="github_ui" value="&lt;b&gt;GitHub&lt;/b&gt;&lt;br&gt;samarvan/omop_agent_ui" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F5F7;strokeColor=#A5ADBA;fontColor=#172B4D;fontFamily=Inter;fontSize=12;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="120" width="260" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="github_agent" value="&lt;b&gt;GitHub&lt;/b&gt;&lt;br&gt;CardiacAI organisation + personal mirror" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F5F7;strokeColor=#A5ADBA;fontColor=#172B4D;fontFamily=Inter;fontSize=12;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="770" y="120" width="300" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="browser" value="&lt;b&gt;User browser&lt;/b&gt;&lt;br&gt;Create projects, maintain YAML,&lt;br&gt;validate and generate SQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#888888;strokeWidth=2;fontColor=#172B4D;fontFamily=Inter;fontSize=13;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="10" y="285" width="220" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui" value="&lt;b&gt;Vercel UI&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5E6C84&quot;&gt;Next.js&lt;/font&gt;&lt;br&gt;&lt;br&gt;Project workspace&lt;br&gt;Account security&lt;br&gt;Supabase sessions&lt;br&gt;Server actions + agent client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#888888;strokeWidth=2;fontColor=#172B4D;fontFamily=Inter;fontSize=13;spacing=12;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="265" width="260" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent" value="&lt;b&gt;Vercel Agent API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5E6C84&quot;&gt;FastAPI&lt;/font&gt;&lt;br&gt;&lt;br&gt;YAML contracts&lt;br&gt;Validation + preflight&lt;br&gt;Bounded SQL generation&lt;br&gt;Deterministic SQL checks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#888888;strokeWidth=2;fontColor=#172B4D;fontFamily=Inter;fontSize=13;spacing=12;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="790" y="265" width="260" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="openai" value="&lt;b&gt;OpenAI API&lt;/b&gt;&lt;br&gt;Responses API&lt;br&gt;&lt;br&gt;Called only for confirmed&lt;br&gt;SQL generation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#888888;strokeWidth=2;fontColor=#172B4D;fontFamily=Inter;fontSize=13;spacing=12;" parent="1" vertex="1">
+                    <mxGeometry x="1190" y="270" width="240" height="135" as="geometry"/>
+                </mxCell>
+                <mxCell id="supabase" value="&lt;b&gt;Supabase&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#5E6C84&quot;&gt;Auth + PostgreSQL&lt;/font&gt;&lt;br&gt;&lt;br&gt;projects&lt;br&gt;specifications + revisions&lt;br&gt;agent_runs + generated SQL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6FCF5;strokeColor=#888888;strokeWidth=2;fontColor=#172B4D;fontFamily=Inter;fontSize=13;spacing=12;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="520" width="260" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="config_heading" value="CONFIGURATION OWNERSHIP" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=11;fontStyle=1;fontColor=#6B778C;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="495" width="240" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui_config" value="&lt;b&gt;UI Vercel environment&lt;/b&gt;&lt;br&gt;&lt;br&gt;NEXT_PUBLIC_SUPABASE_URL&lt;br&gt;NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY&lt;br&gt;SUPABASE_SERVICE_ROLE_KEY (server only)&lt;br&gt;AGENT_API_BASE_URL&lt;br&gt;AGENT_API_TOKEN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#888888;fontColor=#172B4D;fontFamily=Inter;fontSize=12;spacing=12;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="625" y="520" width="340" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="project_config" value="&lt;b&gt;Project settings in Supabase&lt;/b&gt;&lt;br&gt;&lt;br&gt;SQL dialect&lt;br&gt;Output format&lt;br&gt;Source reference style&lt;br&gt;Optional dbt source name" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#888888;fontColor=#172B4D;fontFamily=Inter;fontSize=12;spacing=12;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="685" y="690" width="220" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent_config" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;&lt;b style=&quot;&quot;&gt;Agent-owned configuration&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b style=&quot;&quot;&gt;config.yaml&lt;/b&gt; — provider, model, token limits,&lt;br&gt;retries and safe SQL defaults&lt;br&gt;&lt;br&gt;&lt;b style=&quot;&quot;&gt;API contract&lt;/b&gt; — maximum 2 generation attempts&lt;br&gt;&lt;br&gt;&lt;b style=&quot;&quot;&gt;Vercel environment&lt;/b&gt;&lt;br&gt;OPENAI_API_KEY + AGENT_API_TOKEN&lt;br&gt;&lt;br&gt;Target schemas, contracts and prompts are packaged with the agent repository.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#888888;fontColor=#172B4D;fontFamily=Inter;fontSize=12;spacing=12;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="480" width="350" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="security_note" value="The browser never receives AGENT_API_TOKEN, OPENAI_API_KEY or SUPABASE_SERVICE_ROLE_KEY. Sensitive actions run server-side." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F4F5F7;strokeColor=none;fontColor=#5E6C84;fontFamily=Inter;fontSize=11;spacing=8;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="805" width="560" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend_runtime" value="Runtime data flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=11;fontColor=#5E6C84;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="900" width="140" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend_runtime_line" style="edgeStyle=none;rounded=0;html=1;strokeColor=#1A3A7C;strokeWidth=2;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="60" y="885" as="sourcePoint"/>
+                        <mxPoint x="130" y="885" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legend_config" value="Configuration" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=11;fontColor=#5E6C84;" parent="1" vertex="1">
+                    <mxGeometry x="235" y="900" width="120" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend_config_line" style="edgeStyle=none;rounded=0;html=1;strokeColor=#FFAB00;strokeWidth=2;dashed=1;dashPattern=5 5;endArrow=open;endFill=0;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="235" y="885" as="sourcePoint"/>
+                        <mxPoint x="305" y="885" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legend_deploy" value="Vercel deployment" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=11;fontColor=#5E6C84;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="900" width="150" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend_deploy_line" style="edgeStyle=none;rounded=0;html=1;strokeColor=#A5ADBA;strokeWidth=2;dashed=1;dashPattern=2 3;endArrow=block;endFill=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="390" y="885" as="sourcePoint"/>
+                        <mxPoint x="460" y="885" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="deploy_ui" value="deploy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#A5ADBA;strokeWidth=2;dashed=1;dashPattern=2 3;endArrow=block;endFill=1;fontFamily=Inter;fontSize=10;fontColor=#6B778C;labelBackgroundColor=#FFFFFF;" parent="1" source="github_ui" target="ui" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="deploy_agent" value="deploy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#A5ADBA;strokeWidth=2;dashed=1;dashPattern=2 3;endArrow=block;endFill=1;fontFamily=Inter;fontSize=10;fontColor=#6B778C;labelBackgroundColor=#FFFFFF;" parent="1" source="github_agent" target="agent" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="browser_ui" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1A3A7C;strokeWidth=2;endArrow=block;endFill=1;fontFamily=Inter;fontSize=10;fontColor=#4C6FFF;labelBackgroundColor=#FFFFFF;" parent="1" source="browser" target="ui" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui_supabase" value="Auth + project data" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4C6FFF;strokeWidth=2;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Inter;fontSize=10;fontColor=#4C6FFF;labelBackgroundColor=#FFFFFF;" parent="1" source="ui" target="supabase" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui_agent" value="Bearer token&#xa;validate · preflight · generate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1A3A7C;strokeWidth=2;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Inter;fontSize=10;fontColor=#4C6FFF;labelBackgroundColor=#FFFFFF;" parent="1" source="ui" target="agent" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent_openai" value="Generate only" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1A3A7C;strokeWidth=2;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Inter;fontSize=10;fontColor=#6554C0;labelBackgroundColor=#FFFFFF;" parent="1" source="agent" target="openai" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ui_config_edge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FFAB00;strokeWidth=2;dashed=1;dashPattern=5 5;endArrow=open;endFill=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="ui_config" target="ui" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="620" y="570"/>
+                            <mxPoint x="620" y="374"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="project_config_edge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FFAB00;strokeWidth=2;dashed=1;dashPattern=5 5;endArrow=open;endFill=0;" parent="1" source="project_config" target="supabase" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent_config_edge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FFAB00;strokeWidth=2;dashed=1;dashPattern=5 5;endArrow=open;endFill=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" parent="1" source="agent_config" target="agent" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

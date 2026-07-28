@@ -43,6 +43,8 @@ Output requirements:
 - {format_instruction}
 - {_source_reference_instruction(config["source"])}
 - Produce one SELECT statement with every target field in target-schema order.
+- Quote reserved target identifiers using the configured dialect's identifier
+  quoting rules.
 - For fields with action `null`, action `skip`, or no mapping, emit a typed NULL.
 - Apply every declared join and transformation exactly as specified.
 - When a mapping table is specified, LEFT JOIN that relation by matching every

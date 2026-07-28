@@ -1,0 +1,114 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: condition_era
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  A Condition Era is defined as a span of time when the Person is assumed to have a given condition. Similar
+  to Drug Eras, Condition Eras are chronological periods of Condition Occurrence and every Condition Occurrence
+  record should be part of a Condition Era. Combining individual Condition Occurrences into a single Condition
+  Era serves two purposes:
+
+
+  - It allows aggregation of chronic conditions that require frequent ongoing care, instead of treating
+  each Condition Occurrence as an independent event.
+
+  - It allows aggregation of multiple, closely timed doctor visits for the same Condition to avoid double-counting
+  the Condition Occurrences.
+
+  For example, consider a Person who visits her Primary Care Physician (PCP) and who is referred to a
+  specialist. At a later time, the Person visits the specialist, who confirms the PCP's original diagnosis
+  and provides the appropriate treatment to resolve the condition. These two independent doctor visits
+  should be aggregated into one Condition Era.
+user_guidance: ""
+etl_convention: >-
+  Each Condition Era corresponds to one or many Condition Occurrence records that form a continuous interval.
+
+  The condition_concept_id field contains Concepts that are identical to those of the CONDITION_OCCURRENCE
+  table records that make up the Condition Era. In contrast to Drug Eras, Condition Eras are not aggregated
+  to contain Conditions of different hierarchical layers. The SQl Script for generating CONDITION_ERA
+  records can be found [here](https://ohdsi.github.io/CommonDataModel/sqlScripts.html#condition_eras)
+
+  The Condition Era Start Date is the start date of the first Condition Occurrence.
+
+  The Condition Era End Date is the end date of the last Condition Occurrence. Condition Eras are built
+  with a Persistence Window of 30 days, meaning, if no occurrence of the same condition_concept_id happens
+  within 30 days of any one occurrence, it will be considered the condition_era_end_date.
+fields:
+- name: condition_era_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: ""
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: condition_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Condition
+  description: >-
+    The Concept Id representing the Condition.
+  etl_convention: ""
+- name: condition_era_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The start date for the Condition Era
+
+    constructed from the individual
+
+    instances of Condition Occurrences.
+
+    It is the start date of the very first
+
+    chronologically recorded instance of
+
+    the condition with at least 31 days since any prior record of the same Condition.
+  etl_convention: ""
+- name: condition_era_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The end date for the Condition Era
+
+    constructed from the individual
+
+    instances of Condition Occurrences.
+
+    It is the end date of the final
+
+    continuously recorded instance of the
+
+    Condition.
+  etl_convention: ""
+- name: condition_occurrence_count
+  data_type: integer
+  required: false
+  primary_key: false
+  description: >-
+    The number of individual Condition
+
+    Occurrences used to construct the
+
+    condition era.
+  etl_convention: ""

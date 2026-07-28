@@ -29,17 +29,26 @@ def _format_target_field(
         constraints.append("primary key")
     if target.foreign_key:
         foreign_key = f"foreign key → {target.foreign_key.table}"
+        if target.foreign_key.field:
+            foreign_key += f".{target.foreign_key.field}"
         if target.foreign_key.domain:
             foreign_key += f" ({target.foreign_key.domain})"
+        if target.foreign_key.class_name:
+            foreign_key += f" [{target.foreign_key.class_name}]"
         constraints.append(foreign_key)
 
     lines = [
         f"## {target.name} ({target.data_type}) [{', '.join(constraints)}]",
     ]
-    if target.description:
-        lines.append(f"Description: {target.description}")
-    if target.etl_convention:
-        lines.append(f"ETL convention: {target.etl_convention}")
+
+    # The YAML retains the complete OMOP metadata. Only include detailed
+    # guidance for fields that the model must actively map or derive; NULL
+    # fields need their type and constraints but not costly narrative text.
+    if mapping is not None and mapping.action in {"map", "derive"}:
+        if target.description:
+            lines.append(f"Description: {target.description}")
+        if target.etl_convention:
+            lines.append(f"ETL convention: {target.etl_convention}")
 
     if mapping is None:
         lines.extend(
@@ -95,6 +104,12 @@ def build_context_from_specs(specs: ValidatedSpecs) -> str:
             "",
             f"# OMOP {specs.target_schema.target_table} target schema",
             f"CDM version: {specs.target_schema.cdm_version}",
+            f"CDM schema: {specs.target_schema.cdm_schema}",
+            (
+                "Required OMOP table: "
+                f"{'yes' if specs.target_schema.required else 'no'}"
+            ),
+            f"Table description: {specs.target_schema.description}",
             "## Joins",
         ]
     )

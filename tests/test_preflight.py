@@ -1,3 +1,4 @@
+import copy
 import unittest
 from pathlib import Path
 
@@ -15,7 +16,15 @@ class GenerationPreflightTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         project_root = Path(__file__).resolve().parents[1]
-        cls.specs = validate_specs("person", project_root / "specs")
+        cls.specs = copy.deepcopy(
+            validate_specs("person", project_root / "specs")
+        )
+        # Exercise the review blocker independently of the maintained
+        # mapping's current approval status.
+        for field_mapping in cls.specs.mapping.fields:
+            if field_mapping.target_field == "race_concept_id":
+                field_mapping.review_required = True
+                field_mapping.review_status = "pending"
         raw_config = yaml.safe_load(
             (project_root / "config.yaml").read_text(encoding="utf-8")
         )

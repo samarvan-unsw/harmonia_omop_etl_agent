@@ -1,0 +1,75 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: vocabulary
+cdm_schema: VOCAB
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The VOCABULARY table includes a list of the Vocabularies integrated from various sources or created
+  de novo in OMOP CDM. This reference table contains a single record for each Vocabulary and includes
+  a descriptive name and other associated attributes for the Vocabulary.
+user_guidance: >-
+  The primary purpose of the VOCABULARY table is to provide explicit information about specific vocabulary
+  versions and the references to the sources from which they are asserted. Users can identify the version
+  of a particular vocabulary used in the database, enabling consistency and reproducibility in data analysis.
+  Besides, users can check the vocabulary release version in their CDM which refers to the vocabulary_id
+  = 'None'.
+etl_convention: ""
+fields:
+- name: vocabulary_id
+  data_type: varchar(20)
+  required: true
+  primary_key: true
+  description: >-
+    A unique identifier for each Vocabulary, such
+
+    as ICD9CM, SNOMED, Visit.
+  etl_convention: ""
+- name: vocabulary_name
+  data_type: varchar(255)
+  required: true
+  primary_key: false
+  description: >-
+    The name describing the vocabulary, for
+
+    example, International Classification of
+
+    Diseases, Ninth Revision, Clinical
+
+    Modification, Volume 1 and 2 (NCHS) etc.
+  etl_convention: ""
+- name: vocabulary_reference
+  data_type: varchar(255)
+  required: false
+  primary_key: false
+  description: >-
+    External reference to documentation or
+
+    available download of the about the
+
+    vocabulary.
+  etl_convention: ""
+- name: vocabulary_version
+  data_type: varchar(255)
+  required: false
+  primary_key: false
+  description: >-
+    Version of the Vocabulary as indicated in
+
+    the source.
+  etl_convention: ""
+- name: vocabulary_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    A Concept that represents the Vocabulary the VOCABULARY record belongs to.
+  etl_convention: ""

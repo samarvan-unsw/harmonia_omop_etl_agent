@@ -294,7 +294,8 @@ intentional:
 
 #### `TargetForeignKey`
 
-Defines a referenced OMOP table and optional vocabulary domain.
+Defines a referenced OMOP table and field, plus optional vocabulary domain and
+concept class.
 
 #### `TargetField`
 
@@ -303,8 +304,9 @@ description and ETL convention.
 
 #### `TargetSchemaDocument`
 
-Represents one OMOP target table. Its validator rejects duplicate fields and
-optional primary keys.
+Represents one OMOP target table, including its CDM schema, required flag,
+completeness metadata, table guidance and ordered fields. Its validator rejects
+duplicate fields and optional primary keys.
 
 ## 6. `agent/validation.py`
 
@@ -889,7 +891,11 @@ The user-controlled transformation specification for each OMOP target.
 
 ### `specs/target_schema/`
 
-The target OMOP contract, including field order, types and required fields.
+The generated OMOP CDM 5.4 target catalog, including table metadata, field
+order, datatypes, requirements, keys and official guidance. The repository
+contains 39 tables and 432 fields pinned to an immutable OHDSI source commit.
+`scripts/generate_target_schemas.py` verifies source checksums, validates every
+document and foreign key, then atomically replaces the catalog.
 
 ### `output/`
 
@@ -924,6 +930,7 @@ change local CLI execution.
 | `tests/test_validation.py` | Cross-spec rules, reviews and generated mapping names |
 | `tests/test_api.py` | Authentication, validation, preflight, generation gates and redaction |
 | `tests/test_preflight.py` | Shared readiness, prompt size and token-ceiling calculation |
+| `tests/test_target_schemas.py` | Full OMOP catalog counts, versions, filenames and foreign keys |
 
 The suite uses mocked providers and temporary directories, so it does not make
 API calls:
@@ -949,13 +956,13 @@ python -m unittest discover -s tests -v
 3. Add datatype-equivalence rules if needed.
 4. Add syntax and typed-null tests.
 
-### Add another OMOP table
+### Add mappings for another OMOP table
 
-No Python change should be required. Add:
+No Python change should be required. The target schema is already present for
+every OMOP CDM 5.4 table. Add:
 
 ```text
 specs/mappings/{table}.yml
-specs/target_schema/{table}.yml
 specs/source_schema/{each_source_model}.yml
 ```
 

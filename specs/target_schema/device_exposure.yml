@@ -1,0 +1,230 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: device_exposure
+cdm_schema: CDM
+required: false
+concept_prefix: DEVICE_
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  The Device domain captures information about a person's exposure to a foreign physical object or instrument
+  which is used for diagnostic or therapeutic purposes through a mechanism beyond chemical action. Devices
+  include implantable objects (e.g. pacemakers, stents, artificial joints), medical equipment and supplies
+  (e.g. bandages, crutches, syringes), other instruments used in medical procedures (e.g. sutures, defibrillators)
+  and material used in clinical care (e.g. adhesives, body material, dental material, surgical material).
+user_guidance: >-
+  The distinction between Devices or supplies and Procedures are sometimes blurry, but the former are
+  physical objects while the latter are actions, often to apply a Device or supply.
+etl_convention: >-
+  Source codes and source text fields mapped to Standard Concepts of the Device Domain have to be recorded
+  here.
+fields:
+- name: device_exposure_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    The unique key given to records a person's exposure to a foreign physical object or instrument.
+  etl_convention: >-
+    Each instance of an exposure to a foreign object or device present in the source data should be assigned
+    this unique key.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: ""
+  etl_convention: ""
+- name: device_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Device
+  description: >-
+    The DEVICE_CONCEPT_ID field is recommended for primary use in analyses, and must be used for network
+    studies. This is the standard concept mapped from the source concept id which represents a foreign
+    object or instrument the person was exposed to.
+  etl_convention: >-
+    The CONCEPT_ID that the DEVICE_SOURCE_VALUE maps to.
+- name: device_exposure_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    Use this date to determine the start date of the device record.
+  etl_convention: >-
+    Valid entries include a start date of a procedure to implant a device, the date of a prescription
+    for a device, or the date of device administration.
+- name: device_exposure_start_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    This is not required, though it is in v6. If a source does not specify datetime the convention is
+    to set the time to midnight (00:00:0000)
+- name: device_exposure_end_date
+  data_type: date
+  required: false
+  primary_key: false
+  description: >-
+    The DEVICE_EXPOSURE_END_DATE denotes the day the device exposure ended for the patient, if given.
+  etl_convention: >-
+    Put the end date or discontinuation date as it appears from the source data or leave blank if unavailable.
+- name: device_exposure_end_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If a source does not specify datetime the convention is to set the time to midnight (00:00:0000)
+- name: device_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    You can use the TYPE_CONCEPT_ID to denote the provenance of the record, as in whether the record is
+    from administrative claims or EHR.
+  etl_convention: >-
+    Choose the device_type_concept_id that best represents the provenance of the record. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: unique_device_id
+  data_type: varchar(255)
+  required: false
+  primary_key: false
+  description: >-
+    This is the Unique Device Identification (UDI-DI) number for devices regulated by the FDA, if given.
+  etl_convention: >-
+    For medical devices that are regulated by the FDA, a Unique Device Identification (UDI) is provided
+    if available in the data source and is recorded in the UNIQUE_DEVICE_ID field.
+- name: production_id
+  data_type: varchar(255)
+  required: false
+  primary_key: false
+  description: >-
+    This is the Production Identifier (UDI-PI) portion of the Unique Device Identification.
+  etl_convention: ""
+- name: quantity
+  data_type: integer
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If there is a record of device exposure in the source but no quantity value, then set to 1.
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    The Provider associated with device record, e.g. the provider who wrote the prescription or the provider
+    who implanted the device.
+  etl_convention: >-
+    The ETL may need to make a choice as to which PROVIDER_ID to put here. Based on what is available
+    this may or may not be different than the provider associated with the overall VISIT_OCCURRENCE record.
+- name: visit_occurrence_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_occurrence
+    field: visit_occurrence_id
+  description: >-
+    The Visit during which the device was prescribed or given.
+  etl_convention: >-
+    To populate this field device exposures must be explicitly initiated in the visit.
+- name: visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    The Visit Detail during which the device was prescribed or given.
+  etl_convention: >-
+    To populate this field device exposures must be explicitly initiated in the visit detail record.
+- name: device_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the device exposure that occurred.
+    For example, this could be an NDC or Gemscript code.
+  etl_convention: >-
+    This code is mapped to a Standard Device Concept in the Standardized Vocabularies and the original
+    code is stored here for reference.
+- name: device_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the concept representing the device source value and may not necessarily be standard. This
+    field is discouraged from use in analysis because it is not required to contain Standard Concepts
+    that are used across the OHDSI community, and should only be used when Standard Concepts do not adequately
+    represent the source detail for the Device necessary for a given analytic use case. Consider using
+    DEVICE_CONCEPT_ID instead to enable standardized analytics that can be consistent across the network.
+  etl_convention: >-
+    If the DEVICE_SOURCE_VALUE is coded in the source data using an OMOP supported vocabulary put the
+    concept id representing the source value here.
+- name: unit_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Unit
+  description: >-
+    UNIT_SOURCE_VALUES should be mapped to a Standard Concept in the Unit domain that best represents
+    the unit as given in the source data.
+  etl_convention: >-
+    There is no standardization requirement for units associated with DEVICE_CONCEPT_IDs, however, it
+    is the responsibility of the ETL to choose the most plausible unit. If the source unit is NULL (applicable
+    to cases when there's no numerical value or when it doesn't require a unit), keep unit_concept_id
+    NULL as well. If there's no mapping of a source unit, populate unit_concept_id with 0.
+- name: unit_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the unit of the Device. For
+    example, blood transfusions are considered devices and can be given in mL quantities.
+  etl_convention: >-
+    This code is mapped to a Standard Condition Concept in the Standardized Vocabularies and the original
+    code is stored here for reference. Using the blood transfusion example, blood transfusion is represented
+    by the DEVICE_CONCEPT_ID and the unit (mL) would be housed in the UNIT_SOURCE_VALUE and mapped to
+    a standard concept in the unit domain.
+- name: unit_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the concept representing the UNIT_SOURCE_VALUE and may not necessarily be standard. This field
+    is discouraged from use in analysis because it is not required to contain Standard Concepts that are
+    used across the OHDSI community, and should only be used when Standard Concepts do not adequately
+    represent the source detail for the Unit necessary for a given analytic use case. Consider using UNIT_CONCEPT_ID
+    instead to enable standardized analytics that can be consistent across the network.
+  etl_convention: >-
+    If the UNIT_SOURCE_VALUE is coded in the source data using an OMOP supported vocabulary put the concept
+    id representing the source value here.

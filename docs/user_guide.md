@@ -128,31 +128,13 @@ models:
 
 Declare every source column referenced by a mapping.
 
-## 6. Add or maintain an OMOP target schema
+## 6. Use the OMOP target schemas
 
-Create one YAML file per OMOP target:
+The repository includes one generated YAML file for every OMOP CDM 5.4
+target:
 
 ```text
 specs/target_schema/{omop_table}.yml
-```
-
-Minimal structure:
-
-```yaml
-version: 1
-cdm_version: "5.4"
-target_table: person
-
-fields:
-  - name: person_id
-    data_type: integer
-    required: true
-    primary_key: true
-    description: Unique person identifier.
-
-  - name: year_of_birth
-    data_type: integer
-    required: true
 ```
 
 The target schema controls:
@@ -162,6 +144,16 @@ The target schema controls:
 - Required and optional fields.
 - Primary and foreign keys.
 - OMOP descriptions and ETL conventions.
+
+Do not edit generated target files individually. To refresh the complete
+catalog from the pinned official OHDSI metadata, run:
+
+```bash
+python scripts/generate_target_schemas.py
+```
+
+The source version and normalization decisions are documented in
+`specs/target_schema/README.md`.
 
 ## 7. Add or maintain the source-to-OMOP mapping
 

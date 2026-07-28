@@ -1,0 +1,162 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: concept
+cdm_schema: VOCAB
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The Standardized Vocabularies contains records, or Concepts, that uniquely identify each fundamental
+  unit of meaning used to express clinical information in all domain tables of the CDM. Concepts are derived
+  from vocabularies, which represent clinical information across a domain (e.g. conditions, drugs, procedures)
+  through the use of codes and associated descriptions. Some Concepts are designated Standard Concepts,
+  meaning these Concepts can be used as normative expressions of a clinical entity within the OMOP Common
+  Data Model and standardized analytics. Each Standard Concept belongs to one Domain, which defines the
+  location where the Concept would be expected to occur within the data tables of the CDM. Concepts can
+  represent broad categories ('Cardiovascular disease'), detailed clinical elements ('Myocardial infarction
+  of the anterolateral wall'), or modifying characteristics and attributes that define Concepts at various
+  levels of detail (severity of a disease, associated morphology, etc.). Records in the Standardized Vocabularies
+  tables are derived from national or international vocabularies such as SNOMED-CT, RxNorm, and LOINC,
+  or custom OMOP Concepts defined to cover various aspects of observational data analysis.
+user_guidance: >-
+  The primary purpose of the CONCEPT table is to provide a standardized representation of medical Concepts,
+  allowing for consistent querying and analysis across the healthcare databases. Users can join the CONCEPT
+  table with other tables in the CDM to enrich clinical data with standardized Concept information or
+  use the CONCEPT table as a reference for mapping clinical data from source terminologies to Standard
+  Concepts.
+etl_convention: ""
+fields:
+- name: concept_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    A unique identifier for each Concept across all domains.
+  etl_convention: ""
+- name: concept_name
+  data_type: varchar(255)
+  required: true
+  primary_key: false
+  description: >-
+    An unambiguous, meaningful and descriptive name for the Concept.
+  etl_convention: ""
+- name: domain_id
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  foreign_key:
+    table: domain
+    field: domain_id
+  description: >-
+    A foreign key to the [DOMAIN](https://ohdsi.github.io/CommonDataModel/cdm54.html#domain) table the
+    Concept belongs to.
+  etl_convention: ""
+- name: vocabulary_id
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  foreign_key:
+    table: vocabulary
+    field: vocabulary_id
+  description: >-
+    A foreign key to the [VOCABULARY](https://ohdsi.github.io/CommonDataModel/cdm54.html#vocabulary)
+
+    table indicating from which source the
+
+    Concept has been adapted.
+  etl_convention: ""
+- name: concept_class_id
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept_class
+    field: concept_class_id
+  description: >-
+    The attribute or concept class of the
+
+    Concept. Examples are 'Clinical Drug',
+
+    'Ingredient', 'Clinical Finding' etc.
+  etl_convention: ""
+- name: standard_concept
+  data_type: varchar(1)
+  required: false
+  primary_key: false
+  description: >-
+    This flag determines where a Concept is
+
+    a Standard Concept, i.e. is used in the
+
+    data, a Classification Concept, or a
+
+    non-standard Source Concept. The
+
+    allowable values are 'S' (Standard
+
+    Concept) and 'C' (Classification
+
+    Concept), otherwise the content is NULL.
+  etl_convention: ""
+- name: concept_code
+  data_type: varchar(50)
+  required: true
+  primary_key: false
+  description: >-
+    The concept code represents the identifier
+
+    of the Concept in the source vocabulary,
+
+    such as SNOMED-CT concept IDs,
+
+    RxNorm RXCUIs etc. Note that concept
+
+    codes are not unique across vocabularies.
+  etl_convention: ""
+- name: valid_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date when the Concept was first
+
+    recorded. The default value is
+
+    1-Jan-1970, meaning, the Concept has no
+
+    (known) date of inception.
+  etl_convention: ""
+- name: valid_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date when the Concept became
+
+    invalid because it was deleted or
+
+    superseded (updated) by a new concept.
+
+    The default value is 31-Dec-2099,
+
+    meaning, the Concept is valid until it
+
+    becomes deprecated.
+  etl_convention: ""
+- name: invalid_reason
+  data_type: varchar(1)
+  required: false
+  primary_key: false
+  description: >-
+    Reason the Concept was invalidated.
+
+    Possible values are D (deleted), U
+
+    (replaced with an update) or NULL when
+
+    valid_end_date has the default value.
+  etl_convention: ""

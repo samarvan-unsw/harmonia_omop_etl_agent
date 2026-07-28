@@ -1,0 +1,97 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: observation_period
+cdm_schema: CDM
+required: true
+concept_prefix: null
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  This table contains records which define spans of time during which two conditions are expected to hold:
+  (i) Clinical Events that happened to the Person are recorded in the Event tables, and (ii) absence of
+  records indicate such Events did not occur during this span of time.
+user_guidance: >-
+  For each Person, one or more OBSERVATION_PERIOD records may be present, but they will not overlap or
+  be back to back to each other. Events may exist outside all of the time spans of the OBSERVATION_PERIOD
+  records for a patient, however, absence of an Event outside these time spans cannot be construed as
+  evidence of absence of an Event. Incidence or prevalence rates should only be calculated for the time
+  of active OBSERVATION_PERIOD records. When constructing cohorts, outside Events can be used for inclusion
+  criteria definition, but without any guarantee for the performance of these criteria. Also, OBSERVATION_PERIOD
+  records can be as short as a single day, greatly disturbing the denominator of any rate calculation
+  as part of cohort characterizations. To avoid that, apply minimal observation time as a requirement
+  for any cohort definition.
+etl_convention: >-
+  Each Person needs to have at least one OBSERVATION_PERIOD record, which should represent time intervals
+  with a high capture rate of Clinical Events. Some source data have very similar concepts, such as enrollment
+  periods in insurance claims data. In other source data such as most EHR systems these time spans need
+  to be inferred under a set of assumptions. It is the discretion of the ETL developer to define these
+  assumptions. In many ETL solutions the start date of the first occurrence or the first high quality
+  occurrence of a Clinical Event (Condition, Drug, Procedure, Device, Measurement, Visit) is defined as
+  the start of the OBSERVATION_PERIOD record, and the end date of the last occurrence of last high quality
+  occurrence of a Clinical Event, or the end of the database period becomes the end of the OBSERVATION_PERIOD
+  for each Person. If a Person only has a single Clinical Event the OBSERVATION_PERIOD record can be as
+  short as one day. Depending on these definitions it is possible that Clinical Events fall outside the
+  time spans defined by OBSERVATION_PERIOD records. Family history or history of Clinical Events generally
+  are not used to generate OBSERVATION_PERIOD records around the time they are referring to. Any two overlapping
+  or adjacent OBSERVATION_PERIOD records have to be merged into one.
+fields:
+- name: observation_period_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    A Person can have multiple discrete Observation Periods which are identified by the Observation_Period_Id.
+  etl_convention: >-
+    Assign a unique observation_period_id to each discrete Observation Period for a Person.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The Person ID of the PERSON record for which the Observation Period is recorded.
+  etl_convention: ""
+- name: observation_period_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    Use this date to determine the start date of the Observation Period.
+  etl_convention: >-
+    It is often the case that the idea of Observation Periods does not exist in source data. In those
+    cases, the observation_period_start_date can be inferred as the earliest Event date available for
+    the Person. In insurance claim data, the Observation Period can be considered as the time period the
+    Person is enrolled with a payer. If a Person switches plans but stays with the same payer, and therefore
+    capturing of data continues, that change would be captured in [PAYER_PLAN_PERIOD](https://ohdsi.github.io/CommonDataModel/cdm54.html#payer_plan_period).
+- name: observation_period_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    Use this date to determine the end date of the period for which we can assume that all events for
+    a Person are recorded.
+  etl_convention: >-
+    It is often the case that the idea of Observation Periods does not exist in source data. In those
+    cases, the observation_period_end_date can be inferred as the last Event date available for the Person.
+    In insurance claim data, the Observation Period can be considered as the time period the Person is
+    enrolled with a payer.
+- name: period_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    This field can be used to determine the provenance of the Observation Period as in whether the period
+    was determined from an insurance enrollment file, EHR healthcare encounters, or other sources.
+  etl_convention: >-
+    Choose the observation_period_type_concept_id that best represents how the period was determined.
+    [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).

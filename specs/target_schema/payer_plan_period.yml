@@ -1,0 +1,189 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: payer_plan_period
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  The PAYER_PLAN_PERIOD table captures details of the period of time that a Person is continuously enrolled
+  under a specific health Plan benefit structure from a given Payer. Each Person receiving healthcare
+  is typically covered by a health benefit plan, which pays for (fully or partially), or directly provides,
+  the care. These benefit plans are provided by payers, such as health insurances or state or government
+  agencies. In each plan the details of the health benefits are defined for the Person or her family,
+  and the health benefit Plan might change over time typically with increasing utilization (reaching certain
+  cost thresholds such as deductibles), plan availability and purchasing choices of the Person. The unique
+  combinations of Payer organizations, health benefit Plans and time periods in which they are valid for
+  a Person are recorded in this table.
+user_guidance: >-
+  A Person can have multiple, overlapping, Payer_Plan_Periods in this table. For example, medical and
+  drug coverage in the US can be represented by two Payer_Plan_Periods. The details of the benefit structure
+  of the Plan is rarely known, the idea is just to identify that the Plans are different.
+etl_convention: ""
+fields:
+- name: payer_plan_period_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    A unique identifier for each unique combination of a Person, Payer, Plan, and Period of time.
+  etl_convention: ""
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The Person covered by the Plan.
+  etl_convention: >-
+    A single Person can have multiple, overlapping, PAYER_PLAN_PERIOD records
+- name: payer_plan_period_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    Start date of Plan coverage.
+  etl_convention: ""
+- name: payer_plan_period_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    End date of Plan coverage.
+  etl_convention: ""
+- name: payer_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This field represents the organization who reimburses the provider which administers care to the Person.
+  etl_convention: >-
+    Map the payer directly to a standard CONCEPT_ID with the domain_id of 'Payer' ([Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Payer&standardConcept=Standard&page=1&pageSize=15&query=)).
+    This vocabulary is not exhaustive so if there is a value missing, please see the [custom concepts](https://ohdsi.github.io/CommonDataModel/customConcepts.html)
+    page.
+- name: payer_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This is the Payer as it appears in the source data.
+  etl_convention: ""
+- name: payer_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    If the source data codes the Payer in an OMOP supported vocabulary store the concept_id here.
+- name: plan_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This field represents the specific health benefit Plan the Person is enrolled in.
+  etl_convention: >-
+    Map the Plan directly to a standard CONCEPT_ID in the 'Plan' vocabulary ([Accepted Concepts](http://athena.ohdsi.org/search-terms/terms?domain=Plan&standardConcept=Standard&page=1&pageSize=15&query=)).
+    This vocabulary is not exhaustive so if there is a value missing, please see the [custom concepts](https://ohdsi.github.io/CommonDataModel/customConcepts.html)
+    page.
+- name: plan_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This is the health benefit Plan of the Person as it appears in the source data.
+  etl_convention: ""
+- name: plan_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    If the source data codes the Plan in an OMOP supported vocabulary store the concept_id here.
+- name: sponsor_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This field represents the sponsor of the Plan who finances the Plan. This includes self-insured, small
+    group health plan and large group health plan.
+  etl_convention: >-
+    Map the sponsor directly to a standard CONCEPT_ID with the domain_id of 'Sponsor' ([Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Sponsor&standardConcept=Standard&page=1&pageSize=15&query=)).
+    This vocabulary is not exhaustive so if there is a value missing, please see the [custom concepts](https://ohdsi.github.io/CommonDataModel/customConcepts.html)
+    page.
+- name: sponsor_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    The Plan sponsor as it appears in the source data.
+  etl_convention: ""
+- name: sponsor_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    If the source data codes the sponsor in an OMOP supported vocabulary store the concept_id here.
+- name: family_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    The common identifier for all people (often a family) that covered by the same policy.
+  etl_convention: >-
+    Often these are the common digits of the enrollment id of the policy members.
+- name: stop_reason_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This field represents the reason the Person left the Plan, if known.
+  etl_convention: >-
+    Map the stop reason directly to a standard CONCEPT_ID with a domain of 'Plan Stop Reason' ([Accepted
+    Concepts](http://athena.ohdsi.org/search-terms/terms?domain=Plan+Stop+Reason&standardConcept=Standard&page=1&pageSize=15&query=)).
+    If one does not exist visit the [Custom Concepts](https://ohdsi.github.io/CommonDataModel/customConcepts.html)
+    pate for more information.
+- name: stop_reason_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    The Plan stop reason as it appears in the source data.
+  etl_convention: ""
+- name: stop_reason_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: >-
+    If the source data codes the stop reason in an OMOP supported vocabulary store the concept_id here.

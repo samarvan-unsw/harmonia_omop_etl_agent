@@ -1,0 +1,187 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: cost
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The COST table captures records containing the cost of any medical event recorded in one of the OMOP
+  clinical event tables such as DRUG_EXPOSURE, PROCEDURE_OCCURRENCE, VISIT_OCCURRENCE, VISIT_DETAIL, DEVICE_OCCURRENCE,
+  OBSERVATION or MEASUREMENT.
+
+
+  Each record in the cost table account for the amount of money transacted for the clinical event. So,
+  the COST table may be used to represent both receivables (charges) and payments (paid), each transaction
+  type represented by its COST_CONCEPT_ID. The COST_TYPE_CONCEPT_ID field will use concepts in the Standardized
+  Vocabularies to designate the source (provenance) of the cost data. A reference to the health plan information
+  in the PAYER_PLAN_PERIOD table is stored in the record for information used for the adjudication system
+  to determine the persons benefit for the clinical event.
+user_guidance: >-
+  When dealing with summary costs, the cost of the goods or services the provider provides is often not
+  known directly, but derived from the hospital charges multiplied by an average cost-to-charge ratio.
+etl_convention: >-
+  One cost record is generated for each response by a payer. In a claims databases, the payment and payment
+  terms reported by the payer for the goods or services billed will generate one cost record. If the source
+  data has payment information for more than one payer (i.e. primary insurance and secondary insurance
+  payment for one entity), then a cost record is created for each reporting payer. Therefore, it is possible
+  for one procedure to have multiple cost records for each payer, but typically it contains one or no
+  record per entity. Payer reimbursement cost records will be identified by using the PAYER_PLAN_ID field.
+  Drug costs are composed of ingredient cost (the amount charged by the wholesale distributor or manufacturer),
+  the dispensing fee (the amount charged by the pharmacy and the sales tax).
+fields:
+- name: cost_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: ""
+  etl_convention: ""
+- name: cost_event_id
+  data_type: integer
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: cost_domain_id
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  foreign_key:
+    table: domain
+    field: domain_id
+  description: ""
+  etl_convention: ""
+- name: cost_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: currency_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: total_charge
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: total_cost
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: total_paid
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_by_payer
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_by_patient
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_patient_copay
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_patient_coinsurance
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_patient_deductible
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_by_primary
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_ingredient_cost
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: paid_dispensing_fee
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: payer_plan_period_id
+  data_type: integer
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: amount_allowed
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: revenue_code_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: revenue_code_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    Revenue codes are a method to charge for a class of procedures and conditions in the U.S. hospital
+    system.
+  etl_convention: ""
+- name: drg_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: drg_source_value
+  data_type: varchar(3)
+  required: false
+  primary_key: false
+  description: >-
+    Diagnosis Related Groups are US codes used to classify hospital cases into one of approximately 500
+    groups.
+  etl_convention: ""

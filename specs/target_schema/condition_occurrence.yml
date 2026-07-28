@@ -1,0 +1,226 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: condition_occurrence
+cdm_schema: CDM
+required: false
+concept_prefix: CONDITION_
+measure_person_completeness: true
+measure_person_completeness_threshold: 0.0
+description: >-
+  This table contains records of Events of a Person suggesting the presence of a disease or medical condition
+  stated as a diagnosis, a sign, or a symptom, which is either observed by a Provider or reported by the
+  patient.
+user_guidance: >-
+  Conditions are defined by Concepts from the Condition domain, which form a complex hierarchy. As a result,
+  the same Person with the same disease may have multiple Condition records, which belong to the same
+  hierarchical family. Most Condition records are mapped from diagnostic codes, but recorded signs, symptoms
+  and summary descriptions also contribute to this table. Rule out diagnoses should not be recorded in
+  this table, but in reality their negating nature is not always captured in the source data, and other
+  precautions must be taken when when identifying Persons who should suffer from the recorded Condition.
+  Record all conditions as they exist in the source data. Any decisions about diagnosis/phenotype definitions
+  would be done through cohort specifications. These cohorts can be housed in the [COHORT](https://ohdsi.github.io/CommonDataModel/cdm54.html#payer_plan_period)
+  table. Conditions span a time interval from start to end, but are typically recorded as single snapshot
+  records with no end date. The reason is twofold: (i) At the time of the recording the duration is not
+  known and later not recorded, and (ii) the Persons typically cease interacting with the healthcare system
+  when they feel better, which leads to incomplete capture of resolved Conditions. The [CONDITION_ERA](https://ohdsi.github.io/CommonDataModel/cdm54.html#condition_era)
+  table addresses this issue. Family history and past diagnoses ('history of') are not recorded in this
+  table. Instead, they are listed in the [OBSERVATION](https://ohdsi.github.io/CommonDataModel/cdm54.html#observation)
+  table. Codes written in the process of establishing the diagnosis, such as 'question of' of and 'rule
+  out', should not represented here. Instead, they should be recorded in the [OBSERVATION](https://ohdsi.github.io/CommonDataModel/cdm54.html#observation)
+  table, if they are used for analyses. However, this information is not always available.
+etl_convention: >-
+  Source codes and source text fields mapped to Standard Concepts of the Condition Domain have to be recorded
+  here.
+fields:
+- name: condition_occurrence_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    The unique key given to a condition record for a person. Refer to the ETL for how duplicate conditions
+    during the same visit were handled.
+  etl_convention: >-
+    Each instance of a condition present in the source data should be assigned this unique key. In some
+    cases, a person can have multiple records of the same condition within the same visit. It is valid
+    to keep these duplicates and assign them individual, unique, CONDITION_OCCURRENCE_IDs, though it is
+    up to the ETL how they should be handled.
+- name: person_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: person
+    field: person_id
+  description: >-
+    The PERSON_ID of the PERSON for whom the condition is recorded.
+  etl_convention: ""
+- name: condition_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Condition
+  description: >-
+    The CONDITION_CONCEPT_ID field is recommended for primary use in analyses, and must be used for network
+    studies. This is the standard concept mapped from the source value which represents a condition
+  etl_convention: >-
+    The CONCEPT_ID that the CONDITION_SOURCE_VALUE maps to. Only records whose source values map to concepts
+    with a domain of "Condition" should go in this table. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Condition&standardConcept=Standard&page=1&pageSize=15&query=).
+- name: condition_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    Use this date to determine the start date of the condition
+  etl_convention: >-
+    Most often data sources do not have the idea of a start date for a condition. Rather, if a source
+    only has one date associated with a condition record it is acceptable to use that date for both the
+    CONDITION_START_DATE and the CONDITION_END_DATE.
+- name: condition_start_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If a source does not specify datetime the convention is to set the time to midnight (00:00:0000)
+- name: condition_end_date
+  data_type: date
+  required: false
+  primary_key: false
+  description: >-
+    Use this date to determine the end date of the condition
+  etl_convention: >-
+    Most often data sources do not have the idea of a start date for a condition. Rather, if a source
+    only has one date associated with a condition record it is acceptable to use that date for both the
+    CONDITION_START_DATE and the CONDITION_END_DATE.
+- name: condition_end_datetime
+  data_type: datetime
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    If a source does not specify datetime the convention is to set the time to midnight (00:00:0000)
+- name: condition_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Type Concept
+  description: >-
+    This field can be used to determine the provenance of the Condition record, as in whether the condition
+    was from an EHR system, insurance claim, registry, or other sources.
+  etl_convention: >-
+    Choose the CONDITION_TYPE_CONCEPT_ID that best represents the provenance of the record. [Accepted
+    Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Type+Concept&standardConcept=Standard&page=1&pageSize=15&query=).
+    A more detailed explanation of each Type Concept can be found on the [vocabulary wiki](https://github.com/OHDSI/Vocabulary-v5.0/wiki/Vocab.-TYPE_CONCEPT).
+- name: condition_status_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+    domain: Condition Status
+  description: >-
+    This concept represents the point during the visit the diagnosis was given (admitting diagnosis, final
+    diagnosis), whether the diagnosis was determined due to laboratory findings, if the diagnosis was
+    exclusionary, or if it was a preliminary diagnosis, among others.
+  etl_convention: >-
+    Choose the Concept in the Condition Status domain that best represents the point during the visit
+    when the diagnosis was given. These can include admitting diagnosis, principal diagnosis, and secondary
+    diagnosis. [Accepted Concepts](https://athena.ohdsi.org/search-terms/terms?domain=Condition+Status&standardConcept=Standard&page=1&pageSize=15&query=).
+- name: stop_reason
+  data_type: varchar(20)
+  required: false
+  primary_key: false
+  description: >-
+    The Stop Reason indicates why a Condition is no longer valid with respect to the purpose within the
+    source data. Note that a Stop Reason does not necessarily imply that the condition is no longer occurring.
+  etl_convention: >-
+    This information is often not populated in source data and it is a valid etl choice to leave it blank
+    if the information does not exist.
+- name: provider_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: provider
+    field: provider_id
+  description: >-
+    The provider associated with condition record, e.g. the provider who made the diagnosis or the provider
+    who recorded the symptom.
+  etl_convention: >-
+    The ETL may need to make a choice as to which PROVIDER_ID to put here. Based on what is available
+    this may or may not be different than the provider associated with the overall VISIT_OCCURRENCE record,
+    for example the admitting vs attending physician on an EHR record.
+- name: visit_occurrence_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_occurrence
+    field: visit_occurrence_id
+  description: >-
+    The visit during which the condition occurred.
+  etl_convention: >-
+    Depending on the structure of the source data, this may have to be determined based on dates. If a
+    CONDITION_START_DATE occurs within the start and end date of a Visit it is a valid ETL choice to choose
+    the VISIT_OCCURRENCE_ID from the Visit that subsumes it, even if not explicitly stated in the data.
+    While not required, an attempt should be made to locate the VISIT_OCCURRENCE_ID of the CONDITION_OCCURRENCE
+    record.
+- name: visit_detail_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: visit_detail
+    field: visit_detail_id
+  description: >-
+    The VISIT_DETAIL record during which the condition occurred. For example, if the person was in the
+    ICU at the time of the diagnosis the VISIT_OCCURRENCE record would reflect the overall hospital stay
+    and the VISIT_DETAIL record would reflect the ICU stay during the hospital visit.
+  etl_convention: >-
+    Same rules apply as for the VISIT_OCCURRENCE_ID.
+- name: condition_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the condition that occurred.
+    For example, this could be an ICD10 or Read code.
+  etl_convention: >-
+    This code is mapped to a Standard Condition Concept in the Standardized Vocabularies and the original
+    code is stored here for reference.
+- name: condition_source_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This is the concept representing the condition source value and may not necessarily be standard. This
+    field is discouraged from use in analysis because it is not required to contain Standard Concepts
+    that are used across the OHDSI community, and should only be used when Standard Concepts do not adequately
+    represent the source detail for the Condition necessary for a given analytic use case. Consider using
+    CONDITION_CONCEPT_ID instead to enable standardized analytics that can be consistent across the network.
+  etl_convention: >-
+    If the CONDITION_SOURCE_VALUE is coded in the source data using an OMOP supported vocabulary put the
+    concept id representing the source value here.
+- name: condition_status_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This field houses the verbatim value from the source data representing the condition status.
+  etl_convention: >-
+    This information may be called something different in the source data but the field is meant to contain
+    a value indicating when and how a diagnosis was given to a patient. This source value is mapped to
+    a standard concept which is stored in the CONDITION_STATUS_CONCEPT_ID field.

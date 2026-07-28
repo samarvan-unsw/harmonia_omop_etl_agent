@@ -1,0 +1,74 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: concept_relationship
+cdm_schema: VOCAB
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The CONCEPT_RELATIONSHIP table contains records that define relationships between any two Concepts and
+  the nature or type of the relationship. This table captures various types of relationships, including
+  hierarchical, associative, and other semantic connections, enabling comprehensive analysis and interpretation
+  of clinical concepts. Every kind of relationship is defined in the RELATIONSHIP table.
+user_guidance: >-
+  The CONCEPT_RELATIONSHIP table can be used to explore hierarchical or attribute relationships between
+  concepts to understand the hierarchical structure of clinical concepts and uncover implicit connections
+  and associations within healthcare data. For example, users can utilize mapping relationships ('Maps
+  to') to harmonize data from different sources and terminologies, enabling interoperability and data
+  integration across disparate datasets.
+etl_convention: ""
+fields:
+- name: concept_id_1
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: concept_id_2
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: relationship_id
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  foreign_key:
+    table: relationship
+    field: relationship_id
+  description: >-
+    The relationship between CONCEPT_ID_1 and CONCEPT_ID_2. Please see the [Vocabulary Conventions](https://ohdsi.github.io/CommonDataModel/dataModelConventions.html#concept_relationships).
+    for more information.
+  etl_convention: ""
+- name: valid_start_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date when the relationship is first recorded.
+  etl_convention: ""
+- name: valid_end_date
+  data_type: date
+  required: true
+  primary_key: false
+  description: >-
+    The date when the relationship is invalidated.
+  etl_convention: ""
+- name: invalid_reason
+  data_type: varchar(1)
+  required: false
+  primary_key: false
+  description: >-
+    Reason the relationship was invalidated. Possible values are 'D' (deleted), 'U' (updated) or NULL.
+  etl_convention: ""

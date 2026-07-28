@@ -20,8 +20,13 @@ Each OMOP table uses three specification types:
 specs/
 ├── source_schema/   # Source model names, columns, types and descriptions
 ├── mappings/        # Source-to-OMOP mappings, joins and transformations
-└── target_schema/   # OMOP fields, types, requirements and keys
+└── target_schema/   # Generated OMOP CDM 5.4 catalog (39 tables)
 ```
+
+The target catalog is generated from pinned official OHDSI table- and
+field-level metadata. Regenerate it with
+`python scripts/generate_target_schemas.py`; do not edit individual target
+files.
 
 The mapping lists its `source_models`. Each model is loaded from a YAML file
 with the same name, such as:

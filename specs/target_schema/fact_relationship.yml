@@ -1,0 +1,68 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: fact_relationship
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The FACT_RELATIONSHIP table contains records about the relationships between facts stored as records
+  in any table of the CDM. Relationships can be defined between facts from the same domain, or different
+  domains. Examples of Fact Relationships include: [Person relationships](https://athena.ohdsi.org/search-terms/terms?domain=Relationship&standardConcept=Standard&page=2&pageSize=15&query=)
+  (parent-child), care site relationships (hierarchical organizational structure of facilities within
+  a health system), indication relationship (between drug exposures and associated conditions), usage
+  relationships (of devices during the course of an associated procedure), or facts derived from one another
+  (measurements derived from an associated specimen).
+user_guidance: ""
+etl_convention: >-
+  All relationships are directional, and each relationship is represented twice symmetrically within the
+  FACT_RELATIONSHIP table. For example, two persons if person_id = 1 is the mother of person_id = 2 two
+  records are in the FACT_RELATIONSHIP table (all strings in fact concept_id records in the Concept table:
+
+  - Person, 1, Person, 2, parent of
+
+  - Person, 2, Person, 1, child of
+fields:
+- name: domain_concept_id_1
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: fact_id_1
+  data_type: integer
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: domain_concept_id_2
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""
+- name: fact_id_2
+  data_type: integer
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: relationship_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: ""
+  etl_convention: ""

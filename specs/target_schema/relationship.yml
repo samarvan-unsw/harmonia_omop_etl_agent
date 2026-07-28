@@ -1,0 +1,87 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: relationship
+cdm_schema: VOCAB
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The RELATIONSHIP table provides a reference list of all types of relationships that can be used to associate
+  any two Concepts in the CONCEPT_RELATIONSHIP table, the respective reverse relationships, and their
+  hierarchical characteristics. Note, that Concepts representing relationships between the clinical facts,
+  used for filling in the FACT_RELATIONSHIP table are stored in the CONCEPT table and belong to the Relationship
+  Domain.
+user_guidance: >-
+  Users can leverage the RELATIONSHIP table to explore the full list of direct and reverse relationships
+  within the OMOP vocabulary system. Also, users can get insight into how these relationships can be used
+  in ETL, cohort creation, and other tasks according to their ancestral characteristics.
+etl_convention: ""
+fields:
+- name: relationship_id
+  data_type: varchar(20)
+  required: true
+  primary_key: true
+  description: >-
+    The type of relationship captured by the
+
+    relationship record.
+  etl_convention: ""
+- name: relationship_name
+  data_type: varchar(255)
+  required: true
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: is_hierarchical
+  data_type: varchar(1)
+  required: true
+  primary_key: false
+  description: >-
+    Defines whether a relationship defines
+
+    concepts into classes or hierarchies. Values
+
+    are 1 for hierarchical relationship or 0 if not.
+  etl_convention: ""
+- name: defines_ancestry
+  data_type: varchar(1)
+  required: true
+  primary_key: false
+  description: >-
+    Defines whether a hierarchical relationship
+
+    contributes to the concept_ancestor table.
+
+    These are subsets of the hierarchical
+
+    relationships. Valid values are 1 or 0.
+  etl_convention: ""
+- name: reverse_relationship_id
+  data_type: varchar(20)
+  required: true
+  primary_key: false
+  description: >-
+    The identifier for the relationship used to
+
+    define the reverse relationship between two
+
+    concepts.
+  etl_convention: ""
+- name: relationship_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    A foreign key that refers to an identifier in
+
+    the [CONCEPT](https://ohdsi.github.io/CommonDataModel/cdm54.html#concept) table for the unique
+
+    relationship concept.
+  etl_convention: ""

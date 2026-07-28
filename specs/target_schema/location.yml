@@ -1,0 +1,121 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: location
+cdm_schema: CDM
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The LOCATION table represents a generic way to capture physical location or address information of Persons
+  and Care Sites.
+user_guidance: >-
+  The current iteration of the LOCATION table is US centric. Until a major release to correct this, certain
+  fields can be used to represent different international values.
+
+
+  - STATE can also be used for province or district
+
+
+  - ZIP is also the postal code or postcode
+
+
+  - COUNTY can also be used to represent region
+etl_convention: >-
+  Each address or Location is unique and is present only once in the table. Locations do not contain names,
+  such as the name of a hospital. In order to construct a full address that can be used in the postal
+  service, the address information from the Location needs to be combined with information from the Care
+  Site.
+fields:
+- name: location_id
+  data_type: integer
+  required: true
+  primary_key: true
+  description: >-
+    The unique key given to a unique Location.
+  etl_convention: >-
+    Each instance of a Location in the source data should be assigned this unique key.
+- name: address_1
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This is the first line of the address.
+  etl_convention: ""
+- name: address_2
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: >-
+    This is the second line of the address
+  etl_convention: ""
+- name: city
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: state
+  data_type: varchar(2)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: zip
+  data_type: varchar(9)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Zip codes are handled as strings of up to 9 characters length. For US addresses, these represent either
+    a 3-digit abbreviated Zip code as provided by many sources for patient protection reasons, the full
+    5-digit Zip or the 9-digit (ZIP + 4) codes. Unless for specific reasons analytical methods should
+    expect and utilize only the first 3 digits. For international addresses, different rules apply.
+- name: county
+  data_type: varchar(20)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: ""
+- name: location_source_value
+  data_type: varchar(50)
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Put the verbatim value for the location here, as it shows up in the source.
+- name: country_concept_id
+  data_type: integer
+  required: false
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    The Concept Id representing the country. Values should conform to the [Geography](https://athena.ohdsi.org/search-terms/terms?domain=Geography&standardConcept=Standard&page=1&pageSize=15&query=&boosts)
+    domain.
+  etl_convention: ""
+- name: country_source_value
+  data_type: varchar(80)
+  required: false
+  primary_key: false
+  description: >-
+    The name of the country.
+  etl_convention: ""
+- name: latitude
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Must be between -90 and 90.
+- name: longitude
+  data_type: float
+  required: false
+  primary_key: false
+  description: ""
+  etl_convention: >-
+    Must be between -180 and 180.

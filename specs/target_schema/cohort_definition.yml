@@ -1,0 +1,77 @@
+# Generated from OHDSI CommonDataModel metadata.
+# Source commit: f853f6e39c61b4eb8b3e5287fd573a1ced36c0e4
+# Regenerate with: python scripts/generate_target_schemas.py
+version: 1
+cdm_version: '5.4'
+target_table: cohort_definition
+cdm_schema: RESULTS
+required: false
+concept_prefix: null
+measure_person_completeness: false
+measure_person_completeness_threshold: null
+description: >-
+  The COHORT_DEFINITION table contains records defining a Cohort derived from the data through the associated
+  description and syntax and upon instantiation (execution of the algorithm) placed into the COHORT table.
+  Cohorts are a set of subjects that satisfy a given combination of inclusion criteria for a duration
+  of time. The COHORT_DEFINITION table provides a standardized structure for maintaining the rules governing
+  the inclusion of a subject into a cohort, and can store operational programming code to instantiate
+  the cohort within the OMOP Common Data Model.
+user_guidance: ""
+etl_convention: ""
+fields:
+- name: cohort_definition_id
+  data_type: integer
+  required: true
+  primary_key: false
+  description: >-
+    This is the identifier given to the cohort, usually by the ATLAS application
+  etl_convention: ""
+- name: cohort_definition_name
+  data_type: varchar(255)
+  required: true
+  primary_key: false
+  description: >-
+    A short description of the cohort
+  etl_convention: ""
+- name: cohort_definition_description
+  data_type: varchar
+  required: false
+  primary_key: false
+  description: >-
+    A complete description of the cohort.
+  etl_convention: ""
+- name: definition_type_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    Type defining what kind of Cohort Definition the record represents and how the syntax may be executed.
+  etl_convention: ""
+- name: cohort_definition_syntax
+  data_type: varchar
+  required: false
+  primary_key: false
+  description: >-
+    Syntax or code to operationalize the Cohort Definition.
+  etl_convention: ""
+- name: subject_concept_id
+  data_type: integer
+  required: true
+  primary_key: false
+  foreign_key:
+    table: concept
+    field: concept_id
+  description: >-
+    This field contains a Concept that represents the domain of the subjects that are members of the cohort
+    (e.g., Person, Provider, Visit).
+  etl_convention: ""
+- name: cohort_initiation_date
+  data_type: date
+  required: false
+  primary_key: false
+  description: >-
+    A date to indicate when the Cohort was initiated in the COHORT table.
+  etl_convention: ""
