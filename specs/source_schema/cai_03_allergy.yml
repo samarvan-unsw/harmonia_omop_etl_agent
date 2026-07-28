@@ -1,0 +1,14 @@
+version: 2
+models:
+  - name: cai_03_allergy
+    description: The ALLERGY table contains all allergies that are associated with the patient.
+    columns:
+      - name: allergy_id
+        description: The unique primary identifier of the allergy table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: allergy
+        description: Text description of the allergen
+      - name: allergy_dt_tm
+        description: The date and time for which this allergy becomes effective.  Normally, this will be the date and time the allergy is added, but could be a past or future date and time.

@@ -1,0 +1,15 @@
+version: 2
+models:
+  - name: cai_16_operation_report_code
+    description: The OPERATION_REPORT_CODE table contains Medical Benefit Scheme (MBS) procedure codes that were recorded by the proceduralist in the operation report.
+    columns:
+      - name: cmbs_code
+        description: MBS billing code for the procedure performed
+      - name: cmbs_description
+        description: MBS billing code description for the procedure performed
+      - name: code_entry_sequence
+        description: The sequence number or ordering of the code entry within the operation report.
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: operation_report_id
+        description: The foreign key linking the recorf to the operation report table

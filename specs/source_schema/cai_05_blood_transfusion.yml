@@ -1,0 +1,14 @@
+version: 2
+models:
+  - name: cai_05_blood_transfusion
+    description: The BLOOD_TRANSFUSION table contains information relating to the administration of a blood product.
+    columns:
+      - name: blood_transfusion_id
+        description: The unique primary identifier of the blood transfusion table
+        primary_key: true
+      - name: blood_product_id
+        description: The foreign key linking the record to the blood product table.
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: product_dt_tm
+        description: The date and time when the blood product was administered to the patient

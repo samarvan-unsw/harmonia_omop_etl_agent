@@ -1,0 +1,22 @@
+version: 2
+models:
+  - name: cai_06_diagnosis
+    description: "The DIAGNOSIS table contains a list of the diagnoses associated with a patient's encounter. "
+    columns:
+      - name: diagnosis_id
+        description: The unique primary identifier of the diagnosis table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: diagnosis
+        description: text description of the SNOMED diagnosis
+      - name: diagnosis_dt_tm
+        description: Date/time for which the Diagnosis was saved
+      - name: diagnosis_code
+        description: SNOMED code for the diagnosis
+      - name: diagnosis_type
+        description: The type or category assigned to the diagnosis in the source system.
+      - name: diagnosis_confirmation
+        description: The recorded confirmation status for the diagnosis.
+      - name: diagnosis_classification
+        description: The recorded classification assigned to the diagnosis.

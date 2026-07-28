@@ -1,0 +1,22 @@
+version: 2
+models:
+  - name: cai_10_implant
+    description: The IMPLANT table contains information relating to the devices implanted during the operation.
+    columns:
+      - name: implant_id
+        description: The unique primary identifier of the implant table
+        primary_key: true
+      - name: surgery_id
+        description: The foreign key linking the record to the surgery table
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: implant_description
+        description: Implanted device description
+      - name: manufacturer
+        description: Manufacturer name of the implanted device
+      - name: product_number
+        description: The product number of the implanted device
+      - name: lot_batch_number
+        description: Lot batch number of the implanted device
+      - name: quantity
+        description: Quantity of the device that were implanted

@@ -1,0 +1,22 @@
+version: 2
+models:
+  - name: cai_15_operation_report
+    description: The OPERATION_REPORT table contains information from the operation reports written by the surgeon.
+    columns:
+      - name: operation_report_id
+        description: The unique primary identifier of the operation report table
+        primary_key: true
+      - name: surgery_id
+        description: The foreign key linking the record to the surgical table
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: procedure_type
+        description: Indicates the type of case (e.g. elective, emergency). Elective cases are procedures where the patient was put on a wait list and is admitted from home for the procedure. Emergency cases are procedures that were scheduled during an inpatient visit
+      - name: planned_procedure
+        description: Short, free-text description of the planned procedure
+      - name: indications_for_procedure
+        description: Short, free-text description of the indications for the procedure
+      - name: unplanned_return_to_or
+        description: An indicator of whether a patient had a surgical procedure/operation and required an unplanned return to the operating theatre during the same episode of admitted patient care. The return to the operating theatre should be for a surgical procedure related to the initial procedure, but may be performed by the same surgeon or a different surgeon.
+      - name: performed_dt_tm
+        description: The date and time the operation report was finalised

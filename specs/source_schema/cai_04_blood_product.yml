@@ -1,0 +1,12 @@
+version: 2
+models:
+  - name: cai_04_blood_product
+    description: The BLOOD_PRODUCT table contains information relating to a blood product that was administered.
+    columns:
+      - name: blood_product_id
+        description: The unique primary identifier of the blood product table
+        primary_key: true
+      - name: product_number
+        description: The number assigned to this product to identify it.  Also known as "unit number".  It is entered at the time the product is received into the blood bank's inventory, from the label on the actual bag of blood.  In the case of derivative products, it is the lot number from the batch of derivatives.
+      - name: product_type
+        description: The type of product (ex. "Fresh Frozen Plasma") derived from the label on the bag of blood.

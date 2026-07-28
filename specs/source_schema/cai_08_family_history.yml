@@ -1,0 +1,18 @@
+version: 2
+models:
+  - name: cai_08_family_history
+    description: The FAMILY HISTORY table contains information recorded in EMR about the patient's family medical history
+    columns:
+      - name: family_history_id
+        description: The unique primary identifier of the family history table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: family_history_condition
+        description: The medical condition of the patient's family member
+      - name: relationship
+        description: The relationship that the experiencer of the condition has to the patient
+      - name: age_of_onset
+        description: Age that the experiencer of the condition was at the onset of the condition
+      - name: last_reviewed
+        description: The date this condition was last reviewed in EMR

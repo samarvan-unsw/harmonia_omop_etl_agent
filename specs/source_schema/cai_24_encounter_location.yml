@@ -1,0 +1,25 @@
+version: 2
+models:
+- name: cai_24_encounter_location
+  description: The WARD_MOVEMENT table contains information relating to ward admission, transfer and discharge during a patient's
+    encounter.
+  columns:
+  - name: ward_movement_id
+    description: The unique primary identifier of the ward movement table
+    primary_key: true
+  - name: encounter_id
+    description: The foreign key linking the record to the encounter table
+  - name: to_unit_start_dt_tm
+    description: Date and time the patient was admitted to the 'to_unit'
+  - name: to_unit_end_dt_tm
+    description: Date and time the patient left the 'to_unit'
+  - name: from_unit
+    description: The unit/ward the patient transferred from
+  - name: to_unit
+    description: The unit/ward the patient transferred to
+  - name: ed_bed_type
+    description: The emergency department bed type associated with the location record.
+  - name: from_bed
+    description: The bed the patient transferred from
+  - name: to_bed
+    description: The bed the patient transferred to

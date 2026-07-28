@@ -1,0 +1,18 @@
+version: 2
+models:
+  - name: cai_07_document
+    description: The DOCUMENT table contains information relating to clinical documents. Details of the clinical document type can be found in the Document Concepts table.
+    columns:
+      - name: document_id
+        description: The unique primary identifier of the document table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: note_author_type
+        description: The type or role category of the clinical note author.
+      - name: note_category
+        description: The source-system category assigned to the clinical note.
+      - name: note_type
+        description: 'The type of note that is selected by the note author '
+      - name: document_dt_tm
+        description: The date and time the clinical document was finalised

@@ -1,0 +1,24 @@
+version: 2
+models:
+  - name: cai_19_procedure
+    description: The PROCEDURE table contains information relating to the Medicare Benefits Schedule (MBS) billing codes that were entered for surgical procedures.
+    columns:
+      - name: procedure_code_id
+        description: The unique primary identifier of the procedure table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: procedure_dt_tm
+        description: The date and time assigned to the coded procedure
+      - name: proc_func_type
+        description: The type of procedure function (e.g. anesthesia)
+      - name: procedure_type
+        description: Indicates the type of procedure (e.g. encounter procedure)
+      - name: procedure_code
+        description: The standardised code for this procedure (e.g. MBS code)
+      - name: clinical_service
+        description: Care setting in which the procedure was performed
+      - name: procedure_note
+        description: Free-text note for an individual procedure
+      - name: anaesthesia_type
+        description: Anesthesia used for this procedure

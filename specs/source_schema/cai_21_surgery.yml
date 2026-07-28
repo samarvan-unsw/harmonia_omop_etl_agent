@@ -1,0 +1,60 @@
+version: 2
+models:
+- name: cai_21_surgery
+  description: The SURGERY table contains information relating to a surgical case completed by the theatre nurses.
+  columns:
+  - name: surgery_id
+    description: The unique primary identifier of the surgery table
+    primary_key: true
+  - name: encounter_id
+    description: The foreign key linking the record to the encounter table
+  - name: patient_id
+    description: The foreign key linking the surgery record to the patient table.
+  - name: surgical_area
+    description: The surgical area associated with this surgical case
+  - name: room
+    description: Used for Surgery Mgmt Reporting -- indicates the OR Number assoc. w/ this case
+  - name: speciality
+    description: Identifies the type of proceduralist performing the surgery  (i.e.  Cardiothoracic, Vascular etc.).
+  - name: case_number
+    description: The formatted Surgical case number
+  - name: case_type
+    description: Indicates the type of case (e.g. elective, emergency). Elective cases are procedures where the patient was
+      put on a wait list and is admitted from home for the procedure. Emergency cases are procedures that were scheduled during
+      an inpatient visit
+  - name: primary_procedure
+    description: Standardised text description of the primary surgical procedure.
+  - name: secondary_procedure
+    description: Standardised text description of secondary surgical procedures.
+  - name: planned_procedure
+    description: Standardised text description of the procedure that was planned.
+  - name: actual_procedure
+    description: Standardised text description of the procedure that was performed
+  - name: modifier
+    description: Indicates the anatomical location of the procedure (e.g. left, right) if applicable.
+  - name: pt_in_room_dt_tm
+    description: The date and time that the patient entered the operating theatre room.
+  - name: pt_out_room_dt_tm
+    description: The date and time that the patient exited the operating theatre room.
+  - name: room_duration
+    description: Indicates the total number of minutes the patient was in the operating theatre room.
+  - name: surgery_start_dt_tm
+    description: The date and time the surgical case started.
+  - name: surgery_stop_dt_tm
+    description: The surgery stop date and time.
+  - name: procedure_duration
+    description: Indicates the total duration of this case in minutes.
+  - name: anaes_start_dt_tm
+    description: The date and time that the anaesthetic was commenced.
+  - name: anaes_stop_dt_tm
+    description: The date and time that the anaesthetic was ceased.
+  - name: anaes_duration
+    description: Indicates the total number of minutes the patient was administered anaesthetic.
+  - name: clinical_priority
+    description: Indicates the clinical priority of procedures with a case type of 'elective'
+  - name: emerg_priority
+    description: Indicates the clinical priority of inpatient procedures with a case type of emergency.
+  - name: asa
+    description: Indicates the American Society of Anaethesiology (ASA) class associated with this case.
+  - name: anaes_type
+    description: Indicates the anesthesia type associated with this case (e.g. General, local).

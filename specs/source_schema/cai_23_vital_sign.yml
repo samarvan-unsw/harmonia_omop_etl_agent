@@ -1,0 +1,16 @@
+version: 2
+models:
+- name: cai_23_vital_sign
+  description: The VITAL_SIGN table contains information related to vital sign measurement.  Details of the type of vital
+    sign measurement can be found in the measurement concepts table.
+  columns:
+  - name: encounter_id
+    description: The foreign key linking the record to the encounter table
+  - name: result_dt_tm
+    description: The date and time the vital sign was measured
+  - name: measurement_id
+    description: The unique identifier for each vital sign measurement
+  - name: measurement_name
+    description: The standardized vital sign measurement represented by this row.
+  - name: measurement_value
+    description: The result value for the vital sign

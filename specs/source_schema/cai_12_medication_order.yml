@@ -1,0 +1,46 @@
+version: 2
+models:
+  - name: cai_12_medication_order
+    description: 'The MEDICATION_ORDER table contains information relating to inpatient or admission/discharge (outpatient) medication orders. '
+    columns:
+      - name: medication_order_id
+        description: The unique primary identifier of the medication order table
+        primary_key: true
+      - name: legacy_order_id
+        description: This is the non unique order code in the emr data extract
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: order_type
+        description: "Medication order type (e.g. Inpatient, Discharge Medication as Rx, Documented Medication by Hx). \nInpatient is a medication that is prescribed for administration during the current encounter. \nDischarge medication as Rx is a medication prescribed and script provided to patient to use as an outpatient  (this medication may not nessesarily be given to patient whist an inpatient)\nDocumented medication by Hx is a medication prescribed and recorded as history/discharge medication, pharmacy provides these to the patient on discharge (this medication may not nessesarily be given to patient whist an inpatient)"
+      - name: order_status
+        description: The status of the medication order (e.g. Ordered, Completed). Ordered is an active order where the medication is currently being administered to the patient. Completed is an order that is no longer active and is not being administered to the patient
+      - name: order_primary
+        description: The primary mnemonic of the orderable medication. This is the common name recognized by all clinicians who provide services to patients. For Pharmacy orders, this is the legal generic name.
+      - name: drug_code_cnum
+        description: The CNUM drug code associated with the medication order.
+      - name: drug_code_dnum
+        description: The DNUM drug code associated with the medication order.
+      - name: drug_code_mmdc
+        description: The Main Multum Drug Code associated with the medication order.
+      - name: additional_charts
+        description: Additional charting information associated with the medication order.
+      - name: order_as_mnemonic
+        description: Name, dose and form of the ordered medication order. This is the mnemonic used by direct care providers (physicians, nurses, etc.) when they place orders in applications such as PowerOrders.  This field is important for free text orderables, since order_primary is a generic name and ordered_as_mnemonic carries specific information about the order.
+      - name: dose
+        description: Medication dose ordered
+      - name: order_route
+        description: Medication adminstration route ordered
+      - name: order_drug_form
+        description: Medication form ordered
+      - name: order_frequency
+        description: Medication administration frequency ordered
+      - name: order_prn
+        description: Indicates if the medication is ordered as a 'pro re nata' or scheduled for adminstration as needed
+      - name: order_start_dt_tm
+        description: The start date/time of this order.
+      - name: order_stop_dt_tm
+        description: The projected stop date and time for this order.
+      - name: order_name
+        description: The name of the ordered medication
+      - name: special_instruction
+        description: Special instructions associated with this medication order

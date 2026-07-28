@@ -1,0 +1,24 @@
+version: 2
+models:
+  - name: cai_09_imaging
+    description: The IMAGING table contains information about medical imaging orders and the time of subsequent reports. It does not contain medical images or report text.
+    columns:
+      - name: imaging_id
+        description: The unique primary identifier of the imaging table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: result_title
+        description: Standardised text description of the type of imaging test performed
+      - name: orig_order_dt_tm
+        description: The original order date and time for this order.
+      - name: report_dt_tm
+        description: The date and time the imaging test result was reported in the system
+      - name: report_status
+        description: The status of the imaging report in the source system.
+      - name: reason_for_test
+        description: Free-text description of the reason for ordering the imaging test
+      - name: current_history
+        description: Free-text description of the current medical history of the patient that is associated with this encounter
+      - name: past_history
+        description: Free-text description of the past medical history of the patient at the time of ordering the test

@@ -1,0 +1,22 @@
+version: 2
+models:
+  - name: cai_17_pathology
+    description: The PATHOLOGY table contains information relating to pathology order and results. Details of the type of pathology test can be found in the measurement concepts table.
+    columns:
+      - name: pathology_id
+        description: The unique primary identifier of the pathology table
+        primary_key: true
+      - name: pathology_collection_id
+        description: The source clinical event identifier for the pathology collection or result group.
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: result_dt_tm
+        description: The date and time the pathology test result was reported in the system
+      - name: order_dt_tm
+        description: The original order date and time for this order.
+      - name: collect_dt_tm
+        description: The date and time the pathology sample was collected.
+      - name: measurement_value
+        description: The result value for the pathology test
+      - name: measurement_name
+        description: The standardized pathology measurement represented by this row.

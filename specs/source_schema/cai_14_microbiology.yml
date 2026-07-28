@@ -1,0 +1,18 @@
+version: 2
+models:
+  - name: cai_14_microbiology
+    description: CardiacAI Microbiology table
+    columns:
+      - name: microbiology_id
+        description: The unique primary identifier of the microbiology table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: site
+        description: The site the sample was collected from
+      - name: collection_dt_tm
+        description: The date and time the pathology sample was collected.
+      - name: result_dt_tm
+        description: The date and time the pathology test result was reported in the system
+      - name: result
+        description: Text description of the result of the microbiology test and the antimicrobial sensitivies

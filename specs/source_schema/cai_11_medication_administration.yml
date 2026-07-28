@@ -1,0 +1,18 @@
+version: 2
+models:
+  - name: cai_11_medication_administration
+    description: The MEDICATION_ADMINISTRATION table contains information relating to the administration of medications.
+    columns:
+      - name: medication_administration_id
+        description: The unique primary identifier of the medication administration table
+        primary_key: true
+      - name: medication_order_id
+        description: The foreign key linking the record to the medication order table
+      - name: legacy_order_id
+        description: The source EMR order identifier associated with the medication administration.
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: dose_performed_dt_tm
+        description: "Date and time the medication was administered. For continuous administrations, this field is the end of the time period in which this administration was active.  If the administration is currently active, this field will be NULL.  For intermittent administrations, this field does not apply.\nIf there is a gap between medication administrations this may be due to admission to ICU or a leave of absence from hospital. In these cases medications may be administered but this data is not stored here"
+      - name: ward_when_dose_documented
+        description: The ward or unit recorded when the medication dose was documented.

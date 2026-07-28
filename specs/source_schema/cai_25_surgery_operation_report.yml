@@ -1,0 +1,11 @@
+version: 2
+models:
+- name: cai_25_surgery_operation_report
+  description: CardiacAI Surgery Operation Report table
+  columns:
+  - name: operation_report_id
+    description: The foreign key linking the record to the operation report table
+  - name: surgery_id
+    description: The foreign key linking the record to the surgery table
+  - name: encounter_id
+    description: The foreign key linking the record to the encounter table

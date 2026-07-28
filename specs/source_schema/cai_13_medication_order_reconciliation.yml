@@ -1,0 +1,14 @@
+version: 2
+models:
+  - name: cai_13_medication_order_reconciliation
+    description: The MEDICATION_ORDER_RECONCILIATION table contains information relating to medication reconcilliation events.
+    columns:
+      - name: medication_order_reconciliation_id
+        description: The unique primary identifier of the medication order reconciliation table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: med_recon_type
+        description: The type of medication reconciliation (e.g. partial or complete). A partial reconciliation is a reconciliation of only some of the ordered medications, a complete reconciliation is a reconciliation of all ordered medications
+      - name: med_recon_dt
+        description: The date and time that the reconciliation took place.

@@ -1,0 +1,22 @@
+version: 2
+models:
+  - name: cai_20_social_history
+    description: The SOCIAL_HISTORY table contains information recorded in EMR about the patient's social determinants of health
+    columns:
+      - name: social_history_id
+        description: The unique primary identifier for the social history table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: domain
+        description: The social history domain being assessed (e.g. home environment, employment/education)
+      - name: domain_assessment
+        description: The overall risk assessment made for that social history domain (e.g. high risk, low risk)
+      - name: subcategory
+        description: The name of the subcategory of the social history domain assessment (e.g. Accommodation Status, Living arrangement)
+      - name: subcategory_details
+        description: The details for each subcategory
+      - name: last_updated
+        description: The date this domain assessment was last updated by the clinician
+      - name: last_reviewed
+        description: The date this domain assessment was last reviewed by the clinician

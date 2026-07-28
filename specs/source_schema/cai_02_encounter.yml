@@ -1,0 +1,58 @@
+version: 2
+models:
+  - name: cai_02_encounter
+    description: The ENCOUNTER table contains information regarding an inpatient visit.
+    columns:
+      - name: patient_id
+        description: The unique primary identifier of the patient table that is linked to this encounter
+      - name: encounter_id
+        description: The encounter_id uniquely identifies an encounter in the encounter table
+        primary_key: true
+      - name: inpatient_visit_id
+        description: Unique identifier for the inpatient visit. This is a child of the encounter_id
+      - name: ed_visit_id
+        description: Unique identifier for the emergency department visit. This is a child of the encounter_id
+      - name: inpatient_flag
+        description: Indicates whether the encounter type is inpatient.
+      - name: ed_flag
+        description: Indicates whether the encounter type is emergency department.
+      - name: age
+        description: The age of the patient at the start of this encounter
+      - name: postcode
+        description: The residential postcode of the patient
+      - name: speciality
+        description: The type or category of medical service that the patient is receiving in relation to their encounter.
+      - name: marital_status
+        description: The marital status of the patient as declared by the patient or NOK on admission
+      - name: language
+        description: The primary language spoken by the patient as declared by the patient or NOK on admission
+      - name: religion
+        description: The religion of the patient as declared by the patient or NOK on admission
+      - name: financial_class
+        description: The financal classification used for a given encounter.
+      - name: reg_dt_tm
+        description: The date/time that the facility registration or admission process was performed.
+      - name: estimated_discharge_dt
+        description: The estimated or expected date/time that the patient will depart (outpatient) or will be discharged (inpatient) from the facility.  This field may be null.
+      - name: discharge_dt_tm
+        description: The actual date/time that the patient was discharged from the facility.
+      - name: discharge_to
+        description: The location to which the patient was discharged such as another hospital or nursing home.
+      - name: discharge_status
+        description: The recorded status of the patient at discharge.
+      - name: deceased_dt_tm
+        description: The date and time of death for the person.
+      - name: facility
+        description: The facility that the patient was admitted to.
+      - name: encounter_type
+        description: Categorizes the encounter into a logical group or type. Examples may include inpatient, outpatient, etc.
+      - name: nurse_unit_ward
+        description: This field is the current ward location of the patient at the time of data extraction.
+      - name: admit_source
+        description: Admit source identifies the place from which the patient came before being admitted. (i.e., transfer from another hospital)
+      - name: admit_type
+        description: Admit type indicates the circumstance under which the patient was admitted or will be admitted. (i.e., accident, emergent, routine, elective, labor/delivery, etc.)
+      - name: indigenous_status
+        description: Australian Indigenous status as declared by the patient or NOK on admission
+      - name: country_of_birth
+        description: The country of birth as declared by the patient or NOK on admission

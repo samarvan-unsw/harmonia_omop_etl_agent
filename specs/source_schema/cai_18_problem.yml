@@ -1,0 +1,22 @@
+version: 2
+models:
+  - name: cai_18_problem
+    description: The PROBLEM table contains diagnoses and other conditions that are associated with the patient.
+    columns:
+      - name: problem_id
+        description: The unique primary identifier of the problem table
+        primary_key: true
+      - name: encounter_id
+        description: The foreign key linking the record to the encounter table
+      - name: problem
+        description: A de-normalized or annotated description of the problem.  This is defaulted from the display term of the selected codified problem, and can be extended (annotated) by the clinician.
+      - name: problem_dt_tm
+        description: The date and time for which this problem becomes effective.  Normally, this will be the date and time the problem is added, but could be a past or future date and time.
+      - name: problem_onset_date
+        description: The recorded onset date for the problem.
+      - name: problem_status
+        description: The lifecycle status of the problem, such as active or resolved.
+      - name: problem_confirmation
+        description: The recorded confirmation status for the problem.
+      - name: problem_classification
+        description: The recorded classification assigned to the problem.

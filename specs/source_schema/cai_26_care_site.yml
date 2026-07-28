@@ -1,0 +1,4 @@
+version: 2
+models:
+- name: cai_26_care_site
+  description: CardiacAI Location table

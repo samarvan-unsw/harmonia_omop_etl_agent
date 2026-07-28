@@ -1,0 +1,25 @@
+version: 2
+models:
+- name: cai_22_triage
+  description: The TRIAGE table contains a information extracted from the triage report completed on presentation to the emergency
+    department.
+  columns:
+  - name: triage_id
+    description: The unique primary identifier of the triage table
+    primary_key: true
+  - name: encounter_id
+    description: The foreign key linking the record to the encounter table
+  - name: triage_cat
+    description: The numeric triage category assigned to the patient by the triage nurse on presenting to the emergency department
+  - name: triage_presenting_information
+    description: 'A short, free text description of the patient''s reason for presentation to the emergency department. '
+  - name: triage_addition_presenting_information
+    description: Additional free-text presenting information recorded during triage.
+  - name: triage_visit_reason
+    description: The reason for presentation to the emergency department as a short, standardised text category
+  - name: arrival_mode
+    description: The mode by which the patient arrived at the emergency department.
+  - name: tracking_speciality
+    description: The specialty recorded for emergency department tracking.
+  - name: ed_approved_protocol
+    description: The approved emergency department protocol recorded for the triage encounter.
