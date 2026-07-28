@@ -33,6 +33,74 @@ The application, not the language model, controls:
 The model is responsible only for translating validated mapping instructions
 into SQL.
 
+## Technical setup
+
+### Runtime and dependencies
+
+The supported local runtime is Python 3.12.12, recorded in
+`.python-version`. Runtime dependencies are pinned in `requirements.txt`;
+that file is the installation source of truth for both local and container
+execution.
+
+```bash
+python3.12 -m venv venv
+source venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install --requirement requirements.txt
+cp .env.example .env
+```
+
+Do not install dbt for this repository. The agent generates SQL and validates
+it statically without connecting to a warehouse.
+
+### Local configuration
+
+`config.yaml` contains non-secret agent controls:
+
+- Provider and model.
+- Per-request output-token limit.
+- Initial prompt-size limit.
+- Automatic retry limit.
+- SQL dialect and output format.
+- Source relation reference style.
+
+`.env` contains secrets:
+
+- `OPENAI_API_KEY` for paid generation.
+- `AGENT_API_TOKEN` when the HTTP API is enabled.
+
+Validation and preflight do not require an OpenAI key.
+
+### Verification
+
+Run these checks after setup:
+
+```bash
+python -m agent.cli person --validate-only
+python -m agent.cli person --dry-run
+python -m unittest discover -s tests -v
+```
+
+All tests use mocks or temporary directories and do not contact OpenAI.
+
+### Local API
+
+```bash
+uvicorn agent.api:app --reload --env-file .env
+curl http://127.0.0.1:8000/health
+```
+
+The UI and API must use the same `AGENT_API_TOKEN`. A deployed UI cannot call a
+local API through `127.0.0.1`; configure a deployed HTTPS API URL instead.
+
+### Deployment order
+
+1. Commit and deploy agent contract/API changes.
+2. Verify the agent `/health` endpoint.
+3. Commit and deploy compatible UI changes.
+4. Update UI environment variables only when the API URL or token changes.
+5. Validate a project before permitting generation.
+
 ## 2. End-to-end runtime flow
 
 ```mermaid
@@ -231,6 +299,7 @@ Represents one source field:
 - Optional datatype.
 - Description.
 - Primary-key marker.
+- Optional foreign-key target model and field.
 
 #### `SourceModel`
 
@@ -882,7 +951,8 @@ the API section, and only for the current request.
 
 ### `.env`
 
-Stores `OPENAI_API_KEY`. It is loaded only at runtime and is gitignored.
+Stores `OPENAI_API_KEY` and the optional `AGENT_API_TOKEN`. It is loaded only
+at runtime and is gitignored.
 
 ### `specs/source_schema/`
 
@@ -903,7 +973,9 @@ document and foreign key, then atomically replaces the catalog.
 
 ### `output/`
 
-Contains only promoted SQL outputs and short-lived hidden candidates.
+Contains promoted SQL outputs and short-lived hidden candidates. Generated
+SQL is gitignored; a non-authoritative example is stored under
+`examples/generated/`.
 
 ### `logs/`
 
@@ -935,6 +1007,7 @@ change local CLI execution.
 | `tests/test_api.py` | Authentication, validation, preflight, generation gates and redaction |
 | `tests/test_preflight.py` | Shared readiness, prompt size and token-ceiling calculation |
 | `tests/test_target_schemas.py` | Full OMOP catalog counts, versions, filenames and foreign keys |
+| `tests/test_source_schema_contract.py` | Source primary/foreign-key metadata contracts |
 
 The suite uses mocked providers and temporary directories, so it does not make
 API calls:

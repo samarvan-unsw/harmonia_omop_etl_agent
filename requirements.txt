@@ -1,7 +1,7 @@
-openai==2.47.0
-PyYAML==6.0.3
-python-dotenv==1.2.2
-pydantic==2.13.4
-sqlglot==30.13.0
 fastapi==0.139.2
+openai==2.47.0
+pydantic==2.13.4
+python-dotenv==1.2.2
+PyYAML==6.0.3
+sqlglot==30.13.0
 uvicorn==0.51.0
