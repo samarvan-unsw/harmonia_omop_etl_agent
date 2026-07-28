@@ -1,0 +1,100 @@
+version: 1
+target_table: observation_period
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_02_encounter
+  - cai_05_blood_transfusion
+  - cai_07_document
+  - cai_09_imaging
+  - cai_14_microbiology
+  - cai_17_pathology
+  - cai_19_procedure
+  - cai_23_vital_sign
+  - cai_24_encounter_location
+
+joins: []
+
+fields:
+  - target_field: observation_period_id
+    action: derive
+    source_fields: []
+    transformation: Generate a unique integer observation-period identifier.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment says this identifier should be created but
+      does not define the identifier-generation rule.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: Cast patient_id to integer.
+
+  - target_field: observation_period_start_date
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: reg_dt_tm
+      - model: cai_05_blood_transfusion
+        field: product_dt_tm
+      - model: cai_07_document
+        field: document_dt_tm
+      - model: cai_09_imaging
+        field: orig_order_dt_tm
+      - model: cai_14_microbiology
+        field: collection_dt_tm
+      - model: cai_17_pathology
+        field: order_dt_tm
+      - model: cai_19_procedure
+        field: procedure_dt_tm
+      - model: cai_23_vital_sign
+        field: result_dt_tm
+      - model: cai_24_encounter_location
+        field: to_unit_start_dt_tm
+    transformation: >
+      Select the minimum date across the connected event fields, as directed
+      by the projected OMOP comment.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio does not define how records from the separate event models
+      are unioned and grouped by person before taking the minimum.
+
+  - target_field: observation_period_end_date
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: discharge_dt_tm
+      - model: cai_02_encounter
+        field: deceased_dt_tm
+      - model: cai_07_document
+        field: document_dt_tm
+      - model: cai_09_imaging
+        field: orig_order_dt_tm
+      - model: cai_14_microbiology
+        field: collection_dt_tm
+      - model: cai_17_pathology
+        field: order_dt_tm
+      - model: cai_19_procedure
+        field: procedure_dt_tm
+      - model: cai_23_vital_sign
+        field: result_dt_tm
+      - model: cai_24_encounter_location
+        field: to_unit_end_dt_tm
+    transformation: >
+      Select the maximum date across the connected event fields, as directed
+      by the projected OMOP comment.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio does not define how records from the separate event models
+      are unioned and grouped by person before taking the maximum.
+
+  - target_field: period_type_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set period_type_concept_id to the hardcoded value 32817.

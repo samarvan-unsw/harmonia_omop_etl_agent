@@ -1,0 +1,28 @@
+version: 1
+target_table: death
+
+# Draft extracted from valid arrows on the death page.
+source_models:
+  - cai_02_encounter
+
+joins: []
+
+fields:
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: Cast patient_id to integer.
+
+  - target_field: death_datetime
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: deceased_dt_tm
+    transformation: Use deceased_dt_tm as the death datetime.
+
+# The discharge_status/discharge_to arrow ends at a pseudo target named
+# "death_type input", not at an OMOP field, so it is not represented.
+# death_date is required but has no mapping arrow or marked comment and
+# remains unconfigured for validation to flag.

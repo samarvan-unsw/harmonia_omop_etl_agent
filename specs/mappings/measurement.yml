@@ -1,0 +1,212 @@
+version: 1
+target_table: measurement
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_02_encounter
+  - cai_17_pathology
+  - cai_23_vital_sign
+
+joins: []
+
+fields:
+  - target_field: measurement_id
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_id
+      - model: cai_17_pathology
+        field: pathology_id
+    transformation: >
+      Produce measurement rows from vital-sign and pathology records and
+      generate a unique integer measurement_id.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: >
+      Join each measurement pathway to cai_02_encounter using encounter_id
+      and cast patient_id to integer.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 21 May note directs the encounter join but the drawio does not
+      define the union and join structure for both source pathways.
+
+  - target_field: measurement_concept_id
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_name
+      - model: cai_17_pathology
+        field: measurement_name
+    transformation: >
+      Map selected vital-sign and pathology measurement names to standard
+      Measurement concepts.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment requires mapping and asks whether the DREAM
+      selection logic can be replicated.
+
+  - target_field: measurement_date
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: result_dt_tm
+      - model: cai_17_pathology
+        field: result_dt_tm
+    transformation: Cast the applicable result_dt_tm to date.
+
+  - target_field: measurement_datetime
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: result_dt_tm
+      - model: cai_17_pathology
+        field: result_dt_tm
+    transformation: Use the applicable result_dt_tm.
+
+  - target_field: measurement_time
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: result_dt_tm
+      - model: cai_17_pathology
+        field: result_dt_tm
+    transformation: Format the time component of result_dt_tm as varchar(10).
+
+  - target_field: measurement_type_concept_id
+    action: derive
+    source_fields: []
+    transformation: >
+      Set measurement_type_concept_id to 32856 for the lab-result pathway.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment specifies this value for DREAM's lab-result
+      pathway; confirm the applicable CardiacAI pathways.
+
+  - target_field: operator_concept_id
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_value
+      - model: cai_17_pathology
+        field: measurement_value
+    transformation: >
+      Parse a leading comparison operator from measurement_value and map it
+      to the corresponding Operator concept.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment is truncated after "If result_val starts
+      with >, =, or" and therefore does not define the complete rule.
+
+  - target_field: value_as_number
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_value
+      - model: cai_17_pathology
+        field: measurement_value
+    transformation: >
+      Parse the numeric component of measurement_value after separating
+      operators and categorical values.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 21 May note says the text pattern must be analysed before the
+      parsing logic can be finalised.
+
+  - target_field: value_as_concept_id
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_value
+      - model: cai_17_pathology
+        field: measurement_value
+    transformation: >
+      Map categorical measurement_value values to standard Meas Value
+      concepts.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The external DREAM lookup referenced in the projected OMOP comment was
+      not found.
+
+  - target_field: range_low
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 16 Jul note says to ignore it.
+
+  - target_field: range_high
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 16 Jul note says to ignore it.
+
+  - target_field: provider_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 16 Jul note says to ignore it.
+
+  - target_field: visit_occurrence_id
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: encounter_id
+      - model: cai_17_pathology
+        field: encounter_id
+    transformation: Cast the applicable encounter_id to integer.
+
+  - target_field: visit_detail_id
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: encounter_id
+      - model: cai_17_pathology
+        field: encounter_id
+    transformation: >
+      Use encounter_id to connect the measurement to CardiacAI ward movement
+      and select the applicable visit_detail_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The target comment proposes the join but no time-sensitive
+      ward-movement selection rule is defined.
+
+  - target_field: measurement_source_value
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_name
+      - model: cai_17_pathology
+        field: measurement_name
+    transformation: Preserve the applicable measurement_name as varchar(50).
+
+  - target_field: value_source_value
+    action: derive
+    source_fields:
+      - model: cai_23_vital_sign
+        field: measurement_value
+      - model: cai_17_pathology
+        field: measurement_value
+    transformation: Preserve the verbatim measurement_value as varchar(50).
+
+  - target_field: measurement_event_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 16 Jul note says to ignore it.
+
+  - target_field: meas_event_field_concept_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 16 Jul note says to ignore it for MVP.
+
+# unit_concept_id and unit_source_value remain unconfigured because the drawio
+# explicitly says their source fields are absent from the CardiacAI model.

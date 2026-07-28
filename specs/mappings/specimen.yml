@@ -1,0 +1,66 @@
+version: 1
+target_table: specimen
+
+# Draft extracted from valid arrows on the specimen page.
+source_models:
+  - cai_14_microbiology
+  - cai_17_pathology
+
+joins: []
+
+fields:
+  - target_field: specimen_id
+    action: derive
+    source_fields:
+      - model: cai_17_pathology
+        field: pathology_collection_id
+      - model: cai_14_microbiology
+        field: microbiology_id
+    transformation: >
+      Produce specimen rows from pathology and microbiology and generate a
+      unique integer specimen_id.
+
+  - target_field: person_id
+    action: derive
+    source_fields:
+      - model: cai_17_pathology
+        field: encounter_id
+      - model: cai_14_microbiology
+        field: encounter_id
+    transformation: >
+      Derive person_id from the applicable encounter_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The arrow supplies only encounter_id and no marked comment defines the
+      required encounter-to-person join.
+
+  - target_field: specimen_datetime
+    action: derive
+    source_fields:
+      - model: cai_17_pathology
+        field: collect_dt_tm
+      - model: cai_14_microbiology
+        field: collection_dt_tm
+    transformation: Use the applicable specimen collection datetime.
+
+  - target_field: specimen_source_value
+    action: derive
+    source_fields:
+      - model: cai_14_microbiology
+        field: site
+      - model: cai_17_pathology
+        field: measurement_name
+    transformation: Preserve the applicable site or measurement_name value.
+
+  - target_field: anatomic_site_source_value
+    action: derive
+    source_fields:
+      - model: cai_14_microbiology
+        field: site
+      - model: cai_17_pathology
+        field: measurement_name
+    transformation: Preserve the applicable site or measurement_name value.
+
+# specimen_concept_id, specimen_type_concept_id and specimen_date are required
+# but have no mapping arrows or marked comments and remain unconfigured.

@@ -1,0 +1,47 @@
+version: 1
+target_table: care_site
+
+# Draft extracted from valid arrows on the care_site page. Historical
+# cai_24_ward_movement references are normalized to
+# cai_24_encounter_location.
+source_models:
+  - cai_21_surgery
+  - cai_24_encounter_location
+
+joins: []
+
+fields:
+  - target_field: care_site_name
+    action: derive
+    source_fields:
+      - model: cai_24_encounter_location
+        field: from_unit
+      - model: cai_24_encounter_location
+        field: to_unit
+      - model: cai_21_surgery
+        field: room
+    transformation: >
+      Derive the care-site name from the applicable from_unit, to_unit or
+      surgery room value.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio does not specify precedence, deduplication or hierarchy
+      across the three connected source values.
+
+  - target_field: care_site_source_value
+    action: map
+    source_fields:
+      - model: cai_21_surgery
+        field: room
+    transformation: Cast room to varchar(50).
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The grouped source cell also contains wildcard references to encounter
+      and ward-movement models. Wildcards are not valid contract fields, so
+      only the explicit room field is represented.
+
+# care_site_id is required but has no arrow or marked comment. location_id has
+# an arrow from a source cell that explicitly declares no field. Both remain
+# unconfigured.

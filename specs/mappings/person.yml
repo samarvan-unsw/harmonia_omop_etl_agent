@@ -116,8 +116,11 @@ fields:
     source_fields:
       - model: cai_01_patient
         field: indigenous_status
+      - model: cai_01_patient
+        field: country_of_birth
     transformation: >
-      Populate race_source_value from indigenous_status.
+      Populate race_source_value from indigenous_status and country_of_birth,
+      following both CardiacAI-to-OMOP arrows in the drawio mapping.
 
 
 # Optional projected OMOP fields with no CardiacAI lane connection and no

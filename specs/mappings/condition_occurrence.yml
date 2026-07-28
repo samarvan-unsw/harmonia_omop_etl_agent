@@ -1,0 +1,208 @@
+version: 1
+target_table: condition_occurrence
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_02_encounter
+  - cai_06_diagnosis
+  - cai_18_problem
+  - cai_24_encounter_location
+
+joins: []
+
+fields:
+  - target_field: condition_occurrence_id
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_id
+      - model: cai_18_problem
+        field: problem_id
+    transformation: >
+      Produce separate condition rows from diagnosis_id and problem_id and
+      enforce a unique integer condition_occurrence_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Workshop notes warn that one source identifier may produce two
+      condition rows and require an explicit uniqueness rule.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: >
+      Join diagnosis and problem records to cai_02_encounter using
+      encounter_id and cast patient_id to integer.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The mapping combines diagnosis and problem pathways, so their union and
+      join structure must be approved before SQL generation.
+
+  - target_field: condition_concept_id
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_code
+      - model: cai_18_problem
+        field: problem
+    transformation: >
+      Map diagnosis_code and the available problem value to standard SNOMED
+      concepts. Exclude unmapped records from CONDITION_OCCURRENCE and route
+      them to OBSERVATION as directed by the 20 Apr note.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio expects a future problem_code field, which does not exist in
+      the current source schema. problem is retained as the only valid
+      problem-side field connected to this target.
+
+  - target_field: condition_start_date
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_dt_tm
+      - model: cai_18_problem
+        field: problem_onset_date
+      - model: cai_18_problem
+        field: problem_dt_tm
+    transformation: >
+      Cast diagnosis_dt_tm to date for diagnoses. For problems, use the
+      earlier non-null value of problem_onset_date and problem_dt_tm and cast
+      it to date.
+
+  - target_field: condition_start_datetime
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_dt_tm
+      - model: cai_18_problem
+        field: problem_onset_date
+      - model: cai_18_problem
+        field: problem_dt_tm
+    transformation: >
+      Use diagnosis_dt_tm for diagnoses. For problems, use the earlier
+      non-null value of problem_onset_date and problem_dt_tm.
+
+  - target_field: condition_end_date
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 20 Apr note says to skip it.
+
+  - target_field: condition_end_datetime
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 20 Apr note says to skip it.
+
+  - target_field: condition_status_concept_id
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_type
+      - model: cai_06_diagnosis
+        field: diagnosis_confirmation
+      - model: cai_06_diagnosis
+        field: diagnosis_classification
+      - model: cai_18_problem
+        field: problem_status
+      - model: cai_18_problem
+        field: problem_confirmation
+      - model: cai_18_problem
+        field: problem_classification
+    transformation: >
+      Standardise the connected diagnosis and problem status fields using a
+      controlled condition-status lookup.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment says the candidate fields are messy and
+      requires a decision about which fields fit this purpose.
+
+  - target_field: stop_reason
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 30 Apr note says to skip it.
+
+  - target_field: provider_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 30 Apr note says to skip it.
+
+  - target_field: visit_occurrence_id
+    action: map
+    source_fields:
+      - model: cai_06_diagnosis
+        field: encounter_id
+    transformation: Cast encounter_id to integer.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 30 Apr note says problem encounter_id is not accurately captured;
+      only the valid diagnosis arrow is represented.
+
+  - target_field: visit_detail_id
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: ward_movement_id
+    transformation: >
+      Connect diagnosis or problem to encounter location using encounter_id
+      and select ward_movement_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The SR1 note proposes this connection but does not define the
+      time-sensitive rule for selecting one ward movement.
+
+  - target_field: condition_source_value
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis
+      - model: cai_18_problem
+        field: problem
+    transformation: Preserve the verbatim diagnosis or problem value.
+
+  - target_field: condition_source_concept_id
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_code
+    transformation: >
+      Map diagnosis_code to its source concept ID.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio says problem_code must be added to the source model before
+      the problem pathway can populate this field.
+
+  - target_field: condition_status_source_value
+    action: derive
+    source_fields:
+      - model: cai_06_diagnosis
+        field: diagnosis_type
+      - model: cai_06_diagnosis
+        field: diagnosis_confirmation
+      - model: cai_06_diagnosis
+        field: diagnosis_classification
+      - model: cai_18_problem
+        field: problem_status
+      - model: cai_18_problem
+        field: problem_confirmation
+      - model: cai_18_problem
+        field: problem_classification
+    transformation: Preserve the selected source-side condition status value.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 30 Apr note requires a decision about which nominated status field
+      should be selected.
+
+# condition_type_concept_id is required but remains unconfigured. The SR1 and
+# 30 Apr notes say its concept codes are still to be confirmed in Athena.

@@ -1,0 +1,156 @@
+version: 1
+target_table: visit_occurrence
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_02_encounter
+
+joins: []
+
+fields:
+  - target_field: visit_occurrence_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: encounter_id
+    transformation: Cast encounter_id to integer.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: Cast patient_id to integer.
+
+  - target_field: visit_concept_id
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: encounter_type
+      - model: cai_02_encounter
+        field: admit_type
+    transformation: >
+      Map the combination of encounter_type and admit_type to one standard
+      Visit concept.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Workshop notes require a mapping table and say the mapping must be
+      reviewed against OMOP standards.
+
+  - target_field: visit_start_date
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: reg_dt_tm
+    transformation: Cast reg_dt_tm to date.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Workshop notes accept reg_dt_tm if its null rate is suitable because
+      CardiacAI does not contain the DREAM fallback field.
+
+  - target_field: visit_start_datetime
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: reg_dt_tm
+    transformation: Use reg_dt_tm as the visit start datetime.
+
+  - target_field: visit_end_date
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: discharge_dt_tm
+    transformation: Cast discharge_dt_tm to date.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Workshop notes require confirmation that discharge_dt_tm represents
+      when the patient leaves the facility and is sufficiently populated.
+
+  - target_field: visit_end_datetime
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: discharge_dt_tm
+    transformation: Use discharge_dt_tm as the visit end datetime.
+
+  - target_field: visit_type_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set visit_type_concept_id to 44818518 for EMR records.
+    review_required: true
+    review_status: pending
+    review_comment: The drawio says to verify concept 44818518 in Athena.
+
+  - target_field: provider_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to leave it out.
+
+  - target_field: visit_source_value
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: encounter_type
+    transformation: Cast encounter_type to varchar(50).
+
+  - target_field: visit_source_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set visit_source_concept_id to 0.
+
+  - target_field: admitted_from_concept_id
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: admit_source
+    transformation: >
+      Map admit_source to a standard Visit concept using the external mapping
+      described in the workshop notes.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The notes first say to set this field to 0 and later direct use of an
+      external mapping. The later mapping instruction has been retained.
+
+  - target_field: admitted_from_source_value
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: admit_source
+    transformation: Cast admit_source to varchar(50).
+
+  - target_field: discharged_to_concept_id
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: discharge_to
+    transformation: >
+      Map discharge_to to a standard Visit concept using the external mapping
+      described in the workshop notes.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Confirm the external discharge mapping is current and maps home to
+      concept ID 0 as described in the projected OMOP guidance.
+
+  - target_field: discharged_to_source_value
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: discharge_to
+    transformation: Cast discharge_to to varchar(50).
+
+  - target_field: preceding_visit_occurrence_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to skip it.
+
+# care_site_id remains unconfigured. Its arrow references cai_xx_location,
+# which is not present in the current CardiacAI source schemas.

@@ -1,0 +1,206 @@
+version: 1
+target_table: drug_exposure
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_02_encounter
+  - cai_11_medication_administration
+  - cai_12_medication_order
+
+joins: []
+
+fields:
+  - target_field: drug_exposure_id
+    action: derive
+    source_fields:
+      - model: cai_11_medication_administration
+        field: medication_administration_id
+      - model: cai_12_medication_order
+        field: medication_order_id
+    transformation: >
+      Produce drug-exposure rows from medication administrations and
+      medication orders and create a unique integer identifier.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: >
+      Left join medication administration and medication order to encounter
+      using encounter_id and cast patient_id to integer.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment says medication-order encounter IDs are
+      corrupt and recommends adding person_id directly to that source model.
+
+  - target_field: drug_concept_id
+    action: derive
+    source_fields:
+      - model: cai_12_medication_order
+        field: drug_code_cnum
+      - model: cai_12_medication_order
+        field: drug_code_dnum
+      - model: cai_12_medication_order
+        field: drug_code_mmdc
+    transformation: >
+      Map the available medication-order drug codes to a standard Drug
+      concept.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: The 7 May note says this field requires mapping.
+
+  - target_field: drug_exposure_start_date
+    action: derive
+    source_fields:
+      - model: cai_11_medication_administration
+        field: dose_performed_dt_tm
+      - model: cai_12_medication_order
+        field: order_start_dt_tm
+    transformation: >
+      Use dose_performed_dt_tm for administrations and order_start_dt_tm for
+      orders, then cast the selected value to date.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 7 May note says order_status must be incorporated but the rule has
+      not yet been defined.
+
+  - target_field: drug_exposure_start_datetime
+    action: derive
+    source_fields:
+      - model: cai_11_medication_administration
+        field: dose_performed_dt_tm
+      - model: cai_12_medication_order
+        field: order_start_dt_tm
+    transformation: >
+      Use dose_performed_dt_tm for administrations and order_start_dt_tm for
+      orders.
+
+  - target_field: drug_exposure_end_date
+    action: map
+    source_fields:
+      - model: cai_12_medication_order
+        field: order_stop_dt_tm
+    transformation: Cast order_stop_dt_tm to date.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 7 May note confirms this only for medication orders and says the
+      administration pathway and order_status rule remain unresolved.
+
+  - target_field: drug_exposure_end_datetime
+    action: map
+    source_fields:
+      - model: cai_12_medication_order
+        field: order_stop_dt_tm
+    transformation: Use order_stop_dt_tm for medication orders.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The administration pathway has no current order_stop field and the
+      order_status rule remains unresolved.
+
+  - target_field: verbatim_end_date
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: drug_type_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set drug_type_concept_id to 32817 for administrations.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 7 May note says this DREAM-derived hardcode must be reviewed and
+      included in the mapping tables.
+
+  - target_field: stop_reason
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: refills
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: days_supply
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: sig
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: lot_number
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: provider_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 7 May note says to skip it.
+
+  - target_field: visit_occurrence_id
+    action: derive
+    source_fields:
+      - model: cai_11_medication_administration
+        field: encounter_id
+      - model: cai_12_medication_order
+        field: encounter_id
+    transformation: Cast the applicable pathway encounter_id to integer.
+
+  - target_field: visit_detail_id
+    action: "null"
+    source_fields: []
+    transformation: >
+      Output NULL because the 7 May note says to skip this time-sensitive
+      ward-movement mapping for now.
+
+  - target_field: drug_source_value
+    action: derive
+    source_fields:
+      - model: cai_12_medication_order
+        field: drug_code_cnum
+      - model: cai_12_medication_order
+        field: drug_code_dnum
+      - model: cai_12_medication_order
+        field: drug_code_mmdc
+    transformation: Preserve the applicable source drug code as varchar(50).
+
+  - target_field: drug_source_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set drug_source_concept_id to 0.
+
+  - target_field: route_source_value
+    action: map
+    source_fields:
+      - model: cai_12_medication_order
+        field: order_route
+    transformation: Cast order_route to varchar(50).
+
+  - target_field: dose_unit_source_value
+    action: map
+    source_fields:
+      - model: cai_12_medication_order
+        field: dose
+    transformation: Cast dose to varchar(50), following the drawio arrow.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      dose appears to represent a quantity rather than a unit; confirm the
+      intended source before approval.
+
+# quantity remains unconfigured because the drawio references order_dose,
+# which is absent from both current source schemas. route_concept_id remains
+# unconfigured because its specified administration-route source is also
+# absent.

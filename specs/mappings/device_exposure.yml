@@ -1,0 +1,113 @@
+version: 1
+target_table: device_exposure
+
+# Draft extracted from the POSTPONED device_exposure page. It is intentionally
+# incomplete and retains the drawio's 21 May postponed status.
+source_models:
+  - cai_02_encounter
+  - cai_10_implant
+
+joins:
+  - join_type: left
+    left:
+      model: cai_10_implant
+      field: encounter_id
+    right:
+      model: cai_02_encounter
+      field: encounter_id
+
+fields:
+  - target_field: device_exposure_id
+    action: map
+    source_fields:
+      - model: cai_10_implant
+        field: implant_id
+    transformation: Cast implant_id to integer.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 21 May note says device mapping was postponed because of HTrack
+      data.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: >
+      Join cai_10_implant to cai_02_encounter using encounter_id and cast
+      patient_id to integer.
+
+  - target_field: device_concept_id
+    action: derive
+    source_fields:
+      - model: cai_10_implant
+        field: implant_description
+      - model: cai_10_implant
+        field: manufacturer
+      - model: cai_10_implant
+        field: product_number
+    transformation: >
+      Map implant_description, manufacturer and product_number to a standard
+      Device concept.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The arrows provide source lineage but no controlled mapping rule, and
+      the page is explicitly postponed.
+
+  - target_field: unique_device_id
+    action: derive
+    source_fields:
+      - model: cai_10_implant
+        field: lot_batch_number
+      - model: cai_10_implant
+        field: quantity
+    transformation: >
+      Derive unique_device_id from the two fields connected by the drawio
+      source cell.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The grouped source cell connects both lot_batch_number and quantity to
+      this target; confirm whether only lot_batch_number was intended.
+
+  - target_field: quantity
+    action: derive
+    source_fields:
+      - model: cai_10_implant
+        field: lot_batch_number
+      - model: cai_10_implant
+        field: quantity
+    transformation: >
+      Derive quantity from the two fields connected by the drawio source
+      cell.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The grouped source cell connects both lot_batch_number and quantity to
+      this target; confirm whether only quantity was intended.
+
+  - target_field: visit_occurrence_id
+    action: map
+    source_fields:
+      - model: cai_10_implant
+        field: encounter_id
+    transformation: Cast encounter_id to integer.
+
+  - target_field: device_source_value
+    action: derive
+    source_fields:
+      - model: cai_10_implant
+        field: implant_description
+      - model: cai_10_implant
+        field: manufacturer
+      - model: cai_10_implant
+        field: product_number
+    transformation: >
+      Preserve the connected implant description, manufacturer and product
+      number values as the device source value.
+
+# device_exposure_start_date and device_type_concept_id are required but have
+# no mapping arrows or marked comments, so they remain unconfigured.

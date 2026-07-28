@@ -1,0 +1,164 @@
+version: 1
+target_table: procedure_occurrence
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_09_imaging
+  - cai_16_operation_report_code
+  - cai_21_surgery
+
+joins: []
+
+fields:
+  - target_field: procedure_occurrence_id
+    action: derive
+    source_fields:
+      - model: cai_16_operation_report_code
+        field: operation_report_id
+      - model: cai_09_imaging
+        field: imaging_id
+    transformation: >
+      Combine surgical procedure-code and imaging rows and generate a unique
+      procedure_occurrence_id. For surgery rows without an operation report,
+      use surgery_id after the documented outer join.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The comments identify duplicate operation_report_id values, missing
+      operation reports, and a required full outer join, but the complete
+      union and uniqueness design remains to be approved.
+
+  - target_field: person_id
+    action: derive
+    source_fields:
+      - model: cai_21_surgery
+        field: patient_id
+      - model: cai_09_imaging
+        field: encounter_id
+    transformation: >
+      Use patient_id for surgery rows. For imaging rows, join encounter_id to
+      cai_02_encounter to obtain person_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      cai_02_encounter is described in the target comment but has no
+      CardiacAI-lane source arrow on this page, so the required join source is
+      not declared in this faithful draft.
+
+  - target_field: procedure_concept_id
+    action: derive
+    source_fields:
+      - model: cai_16_operation_report_code
+        field: cmbs_description
+      - model: cai_09_imaging
+        field: result_title
+    transformation: >
+      Map cmbs_description and imaging result_title to standard Procedure
+      concepts.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The 14 May and 23 July notes require controlled mappings for both
+      pathways.
+
+  - target_field: procedure_date
+    action: derive
+    source_fields:
+      - model: cai_21_surgery
+        field: surgery_start_dt_tm
+      - model: cai_09_imaging
+        field: report_dt_tm
+    transformation: Cast the applicable start or report datetime to date.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio label report_date has been matched to the existing
+      report_dt_tm source field; confirm that this historical rename is
+      correct.
+
+  - target_field: procedure_datetime
+    action: derive
+    source_fields:
+      - model: cai_21_surgery
+        field: surgery_start_dt_tm
+      - model: cai_09_imaging
+        field: report_dt_tm
+    transformation: Use the applicable surgery start or imaging report time.
+
+  - target_field: procedure_end_date
+    action: map
+    source_fields:
+      - model: cai_21_surgery
+        field: surgery_stop_dt_tm
+    transformation: Cast surgery_stop_dt_tm to date.
+
+  - target_field: procedure_end_datetime
+    action: map
+    source_fields:
+      - model: cai_21_surgery
+        field: surgery_stop_dt_tm
+    transformation: Use surgery_stop_dt_tm.
+
+  - target_field: modifier_concept_id
+    action: derive
+    source_fields:
+      - model: cai_21_surgery
+        field: modifier
+    transformation: Map modifier to an OMOP standard vocabulary concept.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: The 14 May note requires an external mapping.
+
+  - target_field: quantity
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 14 May note says to skip it.
+
+  - target_field: provider_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the 14 May note says to skip it.
+
+  - target_field: visit_occurrence_id
+    action: derive
+    source_fields:
+      - model: cai_21_surgery
+        field: encounter_id
+      - model: cai_09_imaging
+        field: encounter_id
+    transformation: Cast the applicable encounter_id to integer.
+
+  - target_field: visit_detail_id
+    action: "null"
+    source_fields: []
+    transformation: >
+      Output NULL because the 14 May note says to skip this mapping while the
+      surgical room is unavailable in VISIT_DETAIL.
+
+  - target_field: procedure_source_value
+    action: derive
+    source_fields:
+      - model: cai_16_operation_report_code
+        field: cmbs_description
+      - model: cai_09_imaging
+        field: result_title
+    transformation: Preserve cmbs_description or result_title as varchar(50).
+
+  - target_field: procedure_source_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set procedure_source_concept_id to 0.
+
+  - target_field: modifier_source_value
+    action: map
+    source_fields:
+      - model: cai_21_surgery
+        field: modifier
+    transformation: Cast modifier to varchar(50).
+
+# procedure_type_concept_id is required but remains unconfigured. Its source
+# rule depends on contributor_system_cd, which is not available, and the
+# projected OMOP notes say the correct Athena concept is still unresolved.

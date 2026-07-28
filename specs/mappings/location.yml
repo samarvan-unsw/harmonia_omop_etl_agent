@@ -1,0 +1,40 @@
+version: 1
+target_table: location
+
+# Draft extracted from valid arrows on the location page. The historical
+# cai_24_ward_movement model named in grouped cells contributes no explicit
+# valid source field to these mappings and is not declared.
+source_models:
+  - cai_02_encounter
+
+joins: []
+
+fields:
+  - target_field: state
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: postcode
+    transformation: Cast postcode to varchar(2), following the drawio arrow.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Mapping postcode directly to state appears semantically questionable
+      and the drawio contains no marked transformation comment.
+
+  - target_field: zip
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: postcode
+    transformation: Cast postcode to varchar(9).
+
+  - target_field: location_source_value
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: facility
+    transformation: Cast facility to varchar(50).
+
+# location_id is required but its source cell explicitly contains no field,
+# so it remains unconfigured.

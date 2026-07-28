@@ -1,0 +1,159 @@
+version: 1
+target_table: visit_detail
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio. The historical
+# cai_24_ward_movement name is normalized to cai_24_encounter_location.
+source_models:
+  - cai_02_encounter
+  - cai_24_encounter_location
+
+joins:
+  - join_type: left
+    left:
+      model: cai_24_encounter_location
+      field: encounter_id
+    right:
+      model: cai_02_encounter
+      field: encounter_id
+
+fields:
+  - target_field: visit_detail_id
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: ward_movement_id
+    transformation: Cast ward_movement_id to integer.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      Workshop notes ask whether a ward movement aligns with the OMOP visit
+      detail definition when a person moves across hospitals.
+
+  - target_field: person_id
+    action: map
+    source_fields:
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: >
+      Join encounter location to encounter using encounter_id and cast
+      patient_id to integer.
+
+  - target_field: visit_detail_concept_id
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: encounter_type
+      - model: cai_02_encounter
+        field: admit_type
+    transformation: >
+      Map encounter_type and admit_type to one standard Visit concept.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio also connects ward_type, but that field is absent from
+      cai_24_encounter_location and has therefore not been invented here.
+
+  - target_field: visit_detail_start_date
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: to_unit_start_dt_tm
+    transformation: Cast to_unit_start_dt_tm to date.
+
+  - target_field: visit_detail_start_datetime
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: to_unit_start_dt_tm
+    transformation: Use to_unit_start_dt_tm as the start datetime.
+
+  - target_field: visit_detail_end_date
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: to_unit_end_dt_tm
+    transformation: Cast to_unit_end_dt_tm to date.
+
+  - target_field: visit_detail_end_datetime
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: to_unit_end_dt_tm
+    transformation: Use to_unit_end_dt_tm as the end datetime.
+
+  - target_field: visit_detail_type_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set visit_detail_type_concept_id to 44818518.
+
+  - target_field: provider_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to skip it.
+
+  - target_field: visit_detail_source_value
+    action: derive
+    source_fields:
+      - model: cai_02_encounter
+        field: encounter_type
+      - model: cai_02_encounter
+        field: admit_type
+    transformation: >
+      Preserve the encounter_type and admit_type source values used for the
+      visit-detail concept mapping.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The drawio also connects ward_type, which is not present in the current
+      encounter-location source schema.
+
+  - target_field: visit_detail_source_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set visit_detail_source_concept_id to 0.
+
+  - target_field: admitted_from_concept_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to skip it.
+
+  - target_field: admitted_from_source_value
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: from_unit
+    transformation: Cast from_unit to varchar(50).
+
+  - target_field: discharged_to_source_value
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: to_unit
+    transformation: Cast to_unit to varchar(50).
+
+  - target_field: discharged_to_concept_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to skip it.
+
+  - target_field: preceding_visit_detail_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to skip it.
+
+  - target_field: parent_visit_detail_id
+    action: "null"
+    source_fields: []
+    transformation: Output NULL because the workshop notes say to skip it.
+
+  - target_field: visit_occurrence_id
+    action: map
+    source_fields:
+      - model: cai_24_encounter_location
+        field: encounter_id
+    transformation: Cast encounter_id to integer.
+
+# care_site_id remains unconfigured because cai_26_care_site currently
+# declares no fields, including the care_site_id shown in the drawio.

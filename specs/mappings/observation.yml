@@ -1,0 +1,158 @@
+version: 1
+target_table: observation
+
+# Draft extracted from the CardiacAI data model and Projected OMOP field
+# lanes in cardiac_ai_to_omop_mapping.drawio.
+source_models:
+  - cai_02_encounter
+  - cai_08_family_history
+  - cai_20_social_history
+  - cai_24_encounter_location
+
+joins: []
+
+fields:
+  - target_field: observation_id
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: social_history_id
+      - model: cai_08_family_history
+        field: family_history_id
+    transformation: >
+      Produce observation rows from both source pathways and enforce a unique
+      integer observation_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment says both IDs are generated indexes and
+      suggests alternative activity IDs that are not in the current source
+      schemas.
+
+  - target_field: person_id
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: encounter_id
+      - model: cai_08_family_history
+        field: encounter_id
+      - model: cai_02_encounter
+        field: patient_id
+    transformation: >
+      Join the applicable source encounter_id to cai_02_encounter and cast
+      patient_id to integer.
+
+  - target_field: observation_concept_id
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: domain
+      - model: cai_20_social_history
+        field: subcategory
+      - model: cai_08_family_history
+        field: family_history_condition
+    transformation: >
+      For social history, concatenate domain and subcategory and map only
+      recognised values. For family history, map family_history_condition to
+      a standard Observation concept.
+    mapping_table_name:
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The external DREAM lookup referenced in the comments was not found, and
+      the 23 July note says free-text values should only be retained when
+      mapped.
+
+  - target_field: observation_date
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: last_updated
+      - model: cai_20_social_history
+        field: last_reviewed
+      - model: cai_08_family_history
+        field: last_reviewed
+    transformation: Cast the applicable selected datetime to date.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The projected OMOP comment says these dates are not the observation
+      date and that family-history last_reviewed is approximately 99% null.
+
+  - target_field: observation_datetime
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: last_updated
+      - model: cai_20_social_history
+        field: last_reviewed
+      - model: cai_08_family_history
+        field: last_reviewed
+    transformation: Use the applicable selected datetime.
+    review_required: true
+    review_status: pending
+    review_comment: The drawio says this has the same issues as observation_date.
+
+  - target_field: observation_type_concept_id
+    action: derive
+    source_fields: []
+    transformation: Set observation_type_concept_id to 32817.
+
+  - target_field: value_as_string
+    action: map
+    source_fields:
+      - model: cai_20_social_history
+        field: subcategory_details
+    transformation: >
+      Use subcategory_details for categorical social-history values and
+      output NULL for family-history rows.
+
+  - target_field: visit_occurrence_id
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: encounter_id
+      - model: cai_08_family_history
+        field: encounter_id
+    transformation: Cast the applicable encounter_id to integer.
+
+  - target_field: visit_detail_id
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: encounter_id
+      - model: cai_08_family_history
+        field: encounter_id
+      - model: cai_24_encounter_location
+        field: ward_movement_id
+    transformation: >
+      Join the applicable encounter_id to encounter location and select the
+      corresponding ward_movement_id.
+    review_required: true
+    review_status: pending
+    review_comment: >
+      The comment says to join to cai_24 but does not define the
+      time-sensitive rule for selecting one ward movement.
+
+  - target_field: observation_source_value
+    action: derive
+    source_fields:
+      - model: cai_20_social_history
+        field: domain
+      - model: cai_20_social_history
+        field: subcategory
+      - model: cai_08_family_history
+        field: family_history_condition
+    transformation: >
+      Concatenate domain and subcategory for social history. Split
+      family_history_condition on commas for family-history observations.
+
+  - target_field: value_source_value
+    action: map
+    source_fields:
+      - model: cai_20_social_history
+        field: subcategory_details
+    transformation: Preserve subcategory_details as the verbatim result value.
+
+# The remaining optional target fields have no valid CardiacAI-lane arrows or
+# complete marked transformation instructions and are intentionally omitted.
