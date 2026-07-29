@@ -20,6 +20,32 @@ class GenerationPreflight:
     pending_reviews: tuple[str, ...]
 
 
+def generation_readiness_blockers(
+    preflight: GenerationPreflight,
+) -> tuple[str, ...]:
+    """Return actionable reasons why a validated mapping cannot generate."""
+    blockers: list[str] = []
+    if preflight.pending_reviews:
+        blockers.append(
+            "Pending mapping reviews for target fields: "
+            + ", ".join(preflight.pending_reviews)
+            + ". Approve each review before generation."
+        )
+    if preflight.input_limit_exceeded:
+        excess = (
+            preflight.initial_request_characters
+            - preflight.maximum_initial_prompt_characters
+        )
+        blockers.append(
+            f"Initial request is {preflight.initial_request_characters} "
+            "characters, exceeding the configured limit of "
+            f"{preflight.maximum_initial_prompt_characters} by {excess}. "
+            "Reduce the mapping or source-schema context, or adjust the "
+            "agent prompt limit."
+        )
+    return tuple(blockers)
+
+
 def configured_output_token_ceiling(
     config: dict,
     max_iterations: int,

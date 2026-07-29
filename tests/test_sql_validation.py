@@ -445,5 +445,141 @@ class JoinSqlValidationTest(unittest.TestCase):
         )
 
 
+class UnionAllSqlValidationTest(unittest.TestCase):
+    source_models = ["current_person", "historical_person"]
+    union_all_models = ["current_person", "historical_person"]
+    field_mappings = [
+        FieldMapping(
+            target_field="person_id",
+            action="derive",
+            source_fields=[
+                SourceFieldReference(
+                    model="current_person",
+                    field="patient_id",
+                ),
+                SourceFieldReference(
+                    model="historical_person",
+                    field="patient_id",
+                ),
+            ],
+        )
+    ]
+
+    def _validate(self, sql: str):
+        return validate_sql(
+            sql=sql,
+            dialect="snowflake",
+            expected_fields=["person_id"],
+            field_mappings=self.field_mappings,
+            source_models=self.source_models,
+            declared_joins=[],
+            union_all_models=self.union_all_models,
+        )
+
+    def test_accepts_one_explicit_branch_per_union_model(self):
+        result = self._validate(
+            "SELECT c.patient_id AS person_id FROM current_person AS c "
+            "UNION ALL "
+            "SELECT h.patient_id AS person_id FROM historical_person AS h"
+        )
+
+        self.assertTrue(result.valid, result.errors)
+
+    def test_rejects_union_distinct(self):
+        result = self._validate(
+            "SELECT c.patient_id AS person_id FROM current_person AS c "
+            "UNION "
+            "SELECT h.patient_id AS person_id FROM historical_person AS h"
+        )
+
+        self.assertFalse(result.valid)
+        self.assertTrue(
+            any("UNION DISTINCT is not allowed" in error for error in result.errors)
+        )
+
+    def test_rejects_a_missing_declared_union_branch(self):
+        result = self._validate(
+            "SELECT c.patient_id AS person_id FROM current_person AS c"
+        )
+
+        self.assertFalse(result.valid)
+        self.assertTrue(
+            any("must use UNION ALL" in error for error in result.errors)
+        )
+
+    def test_accepts_typed_null_when_a_branch_has_no_source_mapping(self):
+        mapping = FieldMapping(
+            target_field="person_id",
+            action="map",
+            source_fields=[
+                SourceFieldReference(
+                    model="current_person",
+                    field="patient_id",
+                )
+            ],
+        )
+        target = TargetField(
+            name="person_id",
+            data_type="integer",
+            required=True,
+        )
+
+        result = validate_sql(
+            sql=(
+                "SELECT c.patient_id AS person_id "
+                "FROM current_person AS c UNION ALL "
+                "SELECT CAST(NULL AS INTEGER) AS person_id "
+                "FROM historical_person AS h"
+            ),
+            dialect="snowflake",
+            expected_fields=["person_id"],
+            field_mappings=[mapping],
+            target_fields=[target],
+            source_models=self.source_models,
+            declared_joins=[],
+            union_all_models=self.union_all_models,
+        )
+
+        self.assertTrue(result.valid, result.errors)
+
+    def test_accepts_one_mapping_table_lookup_per_union_branch(self):
+        mapping = FieldMapping(
+            target_field="person_id",
+            action="derive",
+            source_fields=[
+                SourceFieldReference(
+                    model="current_person",
+                    field="patient_id",
+                ),
+                SourceFieldReference(
+                    model="historical_person",
+                    field="patient_id",
+                ),
+            ],
+            mapping_table_name="mapping_person_person_id",
+        )
+
+        result = validate_sql(
+            sql=(
+                "SELECT m.person_id AS person_id "
+                "FROM current_person AS c "
+                "LEFT JOIN mapping_person_person_id AS m "
+                "ON c.patient_id = m.patient_id UNION ALL "
+                "SELECT m.person_id AS person_id "
+                "FROM historical_person AS h "
+                "LEFT JOIN mapping_person_person_id AS m "
+                "ON h.patient_id = m.patient_id"
+            ),
+            dialect="snowflake",
+            expected_fields=["person_id"],
+            field_mappings=[mapping],
+            source_models=self.source_models,
+            declared_joins=[],
+            union_all_models=self.union_all_models,
+        )
+
+        self.assertTrue(result.valid, result.errors)
+
+
 if __name__ == "__main__":
     unittest.main()

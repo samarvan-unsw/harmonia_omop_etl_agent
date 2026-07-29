@@ -76,6 +76,12 @@ def _format_target_field(
             "No additional transformation beyond the declared mapping-table "
             f"lookup and conformity to {target.data_type}."
         )
+    elif len(mapping.source_fields) > 1:
+        transformation = (
+            "Direct 1:1 mapping from the source field belonging to each "
+            "UNION ALL branch; cast only as needed to conform to the OMOP "
+            f"target datatype {target.data_type}."
+        )
     else:
         transformation = (
             "Direct 1:1 source mapping; cast only as needed to conform to "
@@ -139,6 +145,12 @@ def build_context_from_specs(specs: ValidatedSpecs) -> str:
                 f"{join.left.model}.{join.left.field} = "
                 f"{join.right.model}.{join.right.field}"
             )
+    else:
+        lines.append("- None")
+
+    lines.append("## UNION ALL source models")
+    if specs.mapping.union_all:
+        lines.append("- " + ", ".join(specs.mapping.union_all))
     else:
         lines.append("- None")
 

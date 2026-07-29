@@ -520,6 +520,7 @@ Revalidates the specifications and builds the complete context containing:
 - Referenced source models and columns.
 - Target CDM version.
 - Declared source joins.
+- Declared `UNION ALL` source models.
 - Every target field in target-schema order.
 - Target datatypes and constraints.
 - Mapping action, sources and transformation.
@@ -833,7 +834,8 @@ Runs all enabled validation layers:
 8. Validate typed nulls against target datatypes.
 9. Validate source relations.
 10. Validate declared source joins.
-11. Validate mapping-table relations and joins.
+11. Validate declared `UNION ALL` branches.
+12. Validate mapping-table relations and joins.
 
 ### Mapping-expression validation
 
@@ -857,6 +859,10 @@ Runs all enabled validation layers:
 - Join type and field equality match the source contract.
 - Mapping relations use left joins.
 - Each mapping-table source field is matched to a same-named lookup column.
+
+`_union_all_branches()` and `_validate_union_all_sources()` additionally require
+one explicit branch per declared union model, reject `UNION DISTINCT`, and
+validate target coverage and lineage independently in every branch.
 
 ### Supporting helpers
 

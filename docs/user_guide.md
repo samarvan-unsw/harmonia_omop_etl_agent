@@ -234,7 +234,7 @@ Transformation text is optional for a direct mapping with exactly one source
 field. When omitted or blank, the agent maps that source field 1:1 and casts
 only as needed to conform to the OMOP target datatype. Multi-source derivations
 still require transformation instructions unless a mapping table defines the
-lookup.
+lookup or each source field belongs to a different declared `union_all` branch.
 
 ### Source joins
 
@@ -253,6 +253,26 @@ joins:
 
 Only `inner` and `left` joins are supported. Cross joins and undeclared joins
 fail SQL validation.
+
+### UNION ALL source models
+
+Use `union_all` when compatible source tables contain row sets that must be
+stacked rather than joined:
+
+```yaml
+source_models:
+  - current_patient
+  - historical_patient
+joins: []
+union_all:
+  - current_patient
+  - historical_patient
+```
+
+Declare at least two models. Generated SQL must contain one explicit,
+target-aligned `SELECT` branch per model and combine them with `UNION ALL`.
+Plain `UNION` is rejected. A branch uses a typed `NULL` when a target field has
+no source mapping for that branch.
 
 ### Mapping tables
 

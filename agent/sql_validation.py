@@ -119,12 +119,42 @@ def _column_matches_reference(
     )
 
 
+def _typed_null_errors(
+    target_field: str,
+    expression: exp.Expression,
+    expected_type: str | None,
+    dialect: str,
+) -> list[str]:
+    """Validate a NULL projection and its required OMOP datatype."""
+    if not _is_null_expression(expression):
+        return [f"{target_field} must output NULL"]
+    if expected_type is None:
+        return []
+
+    actual_type = _null_cast_type(expression)
+    if actual_type is None:
+        return [
+            f"{target_field} must use typed NULL: "
+            f"CAST(NULL AS {expected_type})"
+        ]
+    if _normalized_data_type(
+        actual_type,
+        dialect,
+    ) != _normalized_data_type(expected_type, dialect):
+        return [
+            f"{target_field} NULL type must be {expected_type}, "
+            f"found {actual_type.sql(dialect=dialect)}"
+        ]
+    return []
+
+
 def _validate_mapping_expressions(
     statement: exp.Select,
     expected_fields: list[str],
     field_mappings: list[FieldMapping],
     target_fields: list[TargetField] | None,
     dialect: str,
+    union_all_models: list[str] | None = None,
 ) -> list[str]:
     """Validate target expressions against mapping actions and lineage."""
     errors: list[str] = []
@@ -140,6 +170,9 @@ def _validate_mapping_expressions(
         if projection.alias_or_name
     }
     qualifiers = _model_qualifiers(statement)
+    union_models = {
+        model.casefold() for model in union_all_models or []
+    }
     declared_models = {
         reference.model.casefold()
         for mapping in field_mappings
@@ -160,40 +193,57 @@ def _validate_mapping_expressions(
 
         mapping = mappings.get(target_field)
         if mapping is None or mapping.action == "null":
-            if not _is_null_expression(expression):
+            null_errors = _typed_null_errors(
+                target_field,
+                expression,
+                target_types.get(target_field),
+                dialect,
+            )
+            if null_errors and not _is_null_expression(expression):
                 action = mapping.action if mapping else "unmapped"
                 errors.append(
                     f"{target_field} must output NULL for action {action}"
                 )
                 continue
-
-            expected_type = target_types.get(target_field)
-            if expected_type is not None:
-                actual_type = _null_cast_type(expression)
-                if actual_type is None:
-                    errors.append(
-                        f"{target_field} must use typed NULL: "
-                        f"CAST(NULL AS {expected_type})"
-                    )
-                elif _normalized_data_type(
-                    actual_type,
-                    dialect,
-                ) != _normalized_data_type(expected_type, dialect):
-                    errors.append(
-                        f"{target_field} NULL type must be {expected_type}, "
-                        f"found {actual_type.sql(dialect=dialect)}"
-                    )
+            errors.extend(null_errors)
             continue
 
+        branch_references = [
+            reference
+            for reference in mapping.source_fields
+            if (
+                reference.model.casefold() not in union_models
+                or reference.model.casefold() in qualifiers
+            )
+        ]
+        has_union_references = any(
+            reference.model.casefold() in union_models
+            for reference in mapping.source_fields
+        )
+        branch_has_no_declared_source = (
+            bool(union_models)
+            and has_union_references
+            and not branch_references
+        )
         if _is_null_expression(expression):
+            if branch_has_no_declared_source:
+                errors.extend(
+                    _typed_null_errors(
+                        target_field,
+                        expression,
+                        target_types.get(target_field),
+                        dialect,
+                    )
+                )
+                continue
             errors.append(
                 f"{target_field} cannot output NULL for action {mapping.action}"
             )
             continue
 
         columns = list(expression.find_all(exp.Column))
-        required_expression_references = mapping.source_fields
-        allowed_expression_references = list(mapping.source_fields)
+        required_expression_references = branch_references
+        allowed_expression_references = list(branch_references)
         if mapping.mapping_table_name:
             mapping_value_reference = SourceFieldReference(
                 model=mapping.mapping_table_name,
@@ -361,27 +411,60 @@ def _join_field_pairs(
     return frozenset(pairs)
 
 
-def _mapping_join_signature(
+def _mapping_join_signatures(
     mapping: FieldMapping,
-) -> frozenset[tuple[tuple[str, str], tuple[str, str]]]:
-    """Build the conventional source-to-mapping-table lookup equalities."""
+    union_all_models: list[str] | None = None,
+) -> tuple[
+    frozenset[tuple[tuple[str, str], tuple[str, str]]],
+    ...,
+]:
+    """Build expected lookup equalities, including per-union branches."""
     mapping_table = mapping.mapping_table_name
     if mapping_table is None:
-        return frozenset()
-    return frozenset(
-        _canonical_field_pair(
-            (reference.model.casefold(), reference.field.casefold()),
-            (mapping_table.casefold(), reference.field.casefold()),
-        )
+        return ()
+
+    union_models = {
+        model.casefold() for model in union_all_models or []
+    }
+    referenced_union_models = {
+        reference.model.casefold()
         for reference in mapping.source_fields
+        if reference.model.casefold() in union_models
+    }
+    branch_models: set[str | None] = (
+        referenced_union_models or {None}
+    )
+    return tuple(
+        frozenset(
+            _canonical_field_pair(
+                (
+                    reference.model.casefold(),
+                    reference.field.casefold(),
+                ),
+                (
+                    mapping_table.casefold(),
+                    reference.field.casefold(),
+                ),
+            )
+            for reference in mapping.source_fields
+            if (
+                reference.model.casefold() not in union_models
+                or reference.model.casefold() == branch_model
+            )
+        )
+        for branch_model in sorted(
+            branch_models,
+            key=lambda model: model or "",
+        )
     )
 
 
 def _validate_source_relations_and_joins(
-    statement: exp.Select,
+    statement: exp.Expression,
     source_models: list[str],
     declared_joins: list[SourceJoin],
     field_mappings: list[FieldMapping],
+    union_all_models: list[str] | None = None,
 ) -> list[str]:
     """Validate physical relations and joins against the mapping contract."""
     errors: list[str] = []
@@ -436,9 +519,13 @@ def _validate_source_relations_and_joins(
 
     unmatched_declared = list(enumerate(declared_joins))
     unmatched_mapping_joins = [
-        mapping
+        (mapping, signature)
         for mapping in field_mappings
         if mapping.mapping_table_name
+        for signature in _mapping_join_signatures(
+            mapping,
+            union_all_models,
+        )
     ]
     for sql_join in statement.find_all(exp.Join):
         join_type = _actual_join_type(sql_join)
@@ -466,12 +553,14 @@ def _validate_source_relations_and_joins(
         if right_model in mapping_table_names:
             field_pairs = _join_field_pairs(sql_join, qualifier_models)
             matched_position = None
-            for position, mapping in enumerate(unmatched_mapping_joins):
+            for position, (mapping, signature) in enumerate(
+                unmatched_mapping_joins
+            ):
                 if mapping.mapping_table_name.casefold() != right_model:
                     continue
                 if join_type != "left":
                     continue
-                if field_pairs != _mapping_join_signature(mapping):
+                if field_pairs != signature:
                     continue
                 matched_position = position
                 break
@@ -517,17 +606,116 @@ def _validate_source_relations_and_joins(
             f"{declared_join.right.model}.{declared_join.right.field}"
         )
 
-    for mapping in unmatched_mapping_joins:
+    for mapping, signature in unmatched_mapping_joins:
         expected_equalities = " AND ".join(
-            f"{reference.model}.{reference.field} = "
-            f"{mapping.mapping_table_name}.{reference.field}"
-            for reference in mapping.source_fields
+            f"{left_model}.{left_field} = "
+            f"{right_model}.{right_field}"
+            for (
+                (left_model, left_field),
+                (right_model, right_field),
+            ) in sorted(signature)
         )
         errors.append(
             "SQL is missing declared mapping-table left join for "
             f"{mapping.target_field}: {expected_equalities}"
         )
 
+    return errors
+
+
+def _union_all_branches(
+    statement: exp.Expression,
+) -> tuple[list[exp.Select], list[str]]:
+    """Flatten one SELECT or a UNION ALL tree into ordered branches."""
+    if isinstance(statement, (exp.Paren, exp.Subquery)):
+        return _union_all_branches(statement.this)
+    if isinstance(statement, exp.Select):
+        return [statement], []
+    if not isinstance(statement, exp.Union):
+        return [], ["output must be one SELECT query"]
+
+    errors: list[str] = []
+    if statement.args.get("distinct") is not False:
+        errors.append(
+            "only UNION ALL is supported; UNION DISTINCT is not allowed"
+        )
+    left_branches, left_errors = _union_all_branches(statement.this)
+    right_branches, right_errors = _union_all_branches(
+        statement.expression
+    )
+    return (
+        left_branches + right_branches,
+        errors + left_errors + right_errors,
+    )
+
+
+def _target_coverage_errors(
+    statement: exp.Select,
+    expected_fields: list[str],
+) -> list[str]:
+    """Validate explicit target fields and their order in one branch."""
+    actual_fields = statement.named_selects
+    if "*" in actual_fields:
+        return ["SELECT * is not allowed; target columns must be explicit"]
+    if actual_fields == expected_fields:
+        return []
+
+    errors: list[str] = []
+    missing = [
+        field for field in expected_fields if field not in actual_fields
+    ]
+    extra = [
+        field for field in actual_fields if field not in expected_fields
+    ]
+    if missing:
+        errors.append("missing target fields: " + ", ".join(missing))
+    if extra:
+        errors.append("unexpected target fields: " + ", ".join(extra))
+    if not missing and not extra:
+        errors.append("target fields are not in target-schema order")
+    return errors
+
+
+def _validate_union_all_sources(
+    branches: list[exp.Select],
+    union_all_models: list[str],
+) -> list[str]:
+    """Require exactly one declared UNION ALL source model per branch."""
+    expected = {model.casefold() for model in union_all_models}
+    seen: list[str] = []
+    errors: list[str] = []
+    for index, branch in enumerate(branches, start=1):
+        branch_models = {
+            table.name.casefold()
+            for table in branch.find_all(exp.Table)
+        } & expected
+        if len(branch_models) != 1:
+            errors.append(
+                f"UNION ALL branch {index} must reference exactly one "
+                "declared union_all source model"
+            )
+            continue
+        seen.append(next(iter(branch_models)))
+
+    missing = sorted(expected - set(seen))
+    duplicates = sorted(
+        model for model in set(seen) if seen.count(model) > 1
+    )
+    if missing:
+        errors.append(
+            "UNION ALL is missing source model branches: "
+            + ", ".join(missing)
+        )
+    if duplicates:
+        errors.append(
+            "UNION ALL repeats source model branches: "
+            + ", ".join(duplicates)
+        )
+    if len(branches) != len(union_all_models):
+        errors.append(
+            f"UNION ALL requires {len(union_all_models)} branches, "
+            f"found {len(branches)}"
+        )
     return errors
 
 
@@ -540,6 +728,7 @@ def validate_sql(
     target_fields: list[TargetField] | None = None,
     source_models: list[str] | None = None,
     declared_joins: list[SourceJoin] | None = None,
+    union_all_models: list[str] | None = None,
 ) -> SqlValidationResult:
     """Validate SQL syntax, target coverage and optional mapping lineage."""
     candidate = _replace_dbt_references(sql) if output_format == "dbt" else sql
@@ -558,33 +747,52 @@ def validate_sql(
         return SqlValidationResult(False, tuple(errors))
 
     statement = statements[0]
-    if not isinstance(statement, exp.Select):
-        errors.append("output must be one SELECT query")
-        return SqlValidationResult(False, tuple(errors))
-
-    actual_fields = statement.named_selects
-    if "*" in actual_fields:
-        errors.append("SELECT * is not allowed; target columns must be explicit")
-    elif actual_fields != expected_fields:
-        missing = [field for field in expected_fields if field not in actual_fields]
-        extra = [field for field in actual_fields if field not in expected_fields]
-        if missing:
-            errors.append("missing target fields: " + ", ".join(missing))
-        if extra:
-            errors.append("unexpected target fields: " + ", ".join(extra))
-        if not missing and not extra:
-            errors.append("target fields are not in target-schema order")
-
-    if field_mappings is not None:
+    branches, branch_errors = _union_all_branches(statement)
+    errors.extend(branch_errors)
+    declared_union_models = union_all_models or []
+    is_union_query = isinstance(statement, exp.Union)
+    if declared_union_models and not is_union_query:
+        errors.append(
+            "SQL must use UNION ALL for the declared union_all source models"
+        )
+    if is_union_query and not declared_union_models:
+        errors.append(
+            "SQL uses UNION ALL but the mapping does not declare union_all "
+            "source models"
+        )
+    if declared_union_models:
         errors.extend(
-            _validate_mapping_expressions(
-                statement,
-                expected_fields,
-                field_mappings,
-                target_fields,
-                dialect,
+            _validate_union_all_sources(
+                branches,
+                declared_union_models,
             )
         )
+
+    for index, branch in enumerate(branches, start=1):
+        prefix = (
+            f"UNION ALL branch {index}: "
+            if is_union_query
+            else ""
+        )
+        errors.extend(
+            prefix + error
+            for error in _target_coverage_errors(
+                branch,
+                expected_fields,
+            )
+        )
+        if field_mappings is not None:
+            errors.extend(
+                prefix + error
+                for error in _validate_mapping_expressions(
+                    branch,
+                    expected_fields,
+                    field_mappings,
+                    target_fields,
+                    dialect,
+                    declared_union_models,
+                )
+            )
 
     if source_models is not None and declared_joins is not None:
         errors.extend(
@@ -593,6 +801,7 @@ def validate_sql(
                 source_models,
                 declared_joins,
                 field_mappings or [],
+                declared_union_models,
             )
         )
 

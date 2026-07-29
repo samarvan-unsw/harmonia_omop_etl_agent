@@ -21,7 +21,10 @@ from pydantic import (
 
 from .contracts import AgentConfig, TargetSchemaDocument
 from .loop import run_agent_with_specs
-from .preflight import build_generation_preflight
+from .preflight import (
+    build_generation_preflight,
+    generation_readiness_blockers,
+)
 from .provider_errors import api_error_message
 from .validation import (
     SpecValidationError,
@@ -620,22 +623,13 @@ def preflight(request: PreflightRequest) -> PreflightResponse:
         config,
         request.max_iterations,
     )
-    blockers = []
-    if result.pending_reviews:
-        blockers.append(
-            "Pending mapping reviews: "
-            + ", ".join(result.pending_reviews)
-        )
-    if result.input_limit_exceeded:
-        blockers.append(
-            "Initial request exceeds the configured character limit."
-        )
+    blockers = generation_readiness_blockers(result)
 
     return PreflightResponse(
         valid=True,
         generation_ready=result.generation_ready,
         omop_table=request.omop_table,
-        blockers=blockers,
+        blockers=list(blockers),
         pending_reviews=list(result.pending_reviews),
         provider=config["provider"],
         model=config["model"],
@@ -681,21 +675,12 @@ def generate(request: GenerationRequest) -> GenerationResponse:
         request.max_iterations,
     )
     if not preflight_result.generation_ready:
-        blockers = []
-        if preflight_result.pending_reviews:
-            blockers.append(
-                "Pending mapping reviews: "
-                + ", ".join(preflight_result.pending_reviews)
-            )
-        if preflight_result.input_limit_exceeded:
-            blockers.append(
-                "Initial request exceeds the configured character limit."
-            )
+        blockers = generation_readiness_blockers(preflight_result)
         return GenerationResponse(
             status="blocked",
             completed=False,
             omop_table=request.omop_table,
-            errors=blockers,
+            errors=list(blockers),
             output_token_ceiling=preflight_result.output_token_ceiling,
             model=config["model"],
         )

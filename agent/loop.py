@@ -152,6 +152,7 @@ def run_agent_with_specs(
                         target_fields=specs.target_schema.fields,
                         source_models=specs.mapping.source_models,
                         declared_joins=specs.mapping.joins,
+                        union_all_models=specs.mapping.union_all,
                     )
                     tool_result = (
                         f"{tool_result}\n{validation.as_tool_message()}"

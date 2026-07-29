@@ -47,6 +47,10 @@ Output requirements:
   quoting rules.
 - For fields with action `null` or no mapping, emit a typed NULL.
 - Apply every declared join and transformation exactly as specified.
+- When UNION ALL source models are declared, produce one explicit SELECT branch
+  per declared model and combine the branches with UNION ALL. Keep every target
+  field in target-schema order in every branch. Use a typed NULL when a target
+  field has no declared source field for that branch.
 - When no transformation is supplied for a mapped field without a mapping table,
   map its single declared source field 1:1 and cast only as needed to conform to
   the target OMOP datatype.

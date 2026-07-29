@@ -172,10 +172,10 @@ class FieldMapping(StrictModel):
             self.action in {"map", "derive"}
             and not self.transformation.strip()
             and "mapping_table_name" not in self.model_fields_set
-            and len(self.source_fields) != 1
+            and not self.source_fields
         ):
             raise ValueError(
-                "a blank transformation requires exactly one source field"
+                "a blank transformation requires at least one source field"
             )
         if self.action == "null" and self.source_fields:
             raise ValueError(f"{self.action} cannot contain source fields")
@@ -212,6 +212,7 @@ class MappingDocument(StrictModel):
     target_table: SqlIdentifier
     source_models: list[SqlIdentifier] = Field(min_length=1)
     joins: list[SourceJoin] = Field(default_factory=list)
+    union_all: list[SqlIdentifier] = Field(default_factory=list)
     fields: list[FieldMapping] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -228,6 +229,18 @@ class MappingDocument(StrictModel):
 
         if len(self.source_models) != len(set(self.source_models)):
             raise ValueError("source_models contains duplicates")
+        if self.union_all and len(self.union_all) < 2:
+            raise ValueError("union_all requires at least two source models")
+        if len(self.union_all) != len(set(self.union_all)):
+            raise ValueError("union_all contains duplicate source models")
+        undeclared_union_models = sorted(
+            set(self.union_all) - set(self.source_models)
+        )
+        if undeclared_union_models:
+            raise ValueError(
+                "union_all source models are not declared: "
+                + ", ".join(undeclared_union_models)
+            )
 
         target_fields = [mapping.target_field for mapping in self.fields]
         if len(target_fields) != len(set(target_fields)):
@@ -252,6 +265,28 @@ class MappingDocument(StrictModel):
             raise ValueError(
                 f"source models are not declared: {', '.join(undeclared)}"
             )
+
+        union_models = set(self.union_all)
+        for mapping in self.fields:
+            if (
+                mapping.action in {"map", "derive"}
+                and not mapping.transformation.strip()
+                and mapping.mapping_table_name is None
+                and len(mapping.source_fields) > 1
+            ):
+                referenced_models = [
+                    reference.model for reference in mapping.source_fields
+                ]
+                if (
+                    not union_models
+                    or not set(referenced_models).issubset(union_models)
+                    or len(referenced_models) != len(set(referenced_models))
+                ):
+                    raise ValueError(
+                        f"{mapping.target_field}: a blank transformation "
+                        "with multiple source fields requires one field per "
+                        "declared union_all model"
+                    )
         return self
 
 

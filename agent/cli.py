@@ -18,6 +18,7 @@ from .loop import run_agent
 from .preflight import (
     build_generation_preflight,
     configured_output_token_ceiling,
+    generation_readiness_blockers,
 )
 from .provider_errors import api_error_message
 from .validation import (
@@ -175,7 +176,7 @@ def main():
         config,
         args.max_iterations,
     )
-    # Keep the CLI review-gate seam stable for existing integrations/tests.
+    # Keep this seam patchable for CLI integrations and review-gate tests.
     pending_reviews = pending_review_fields(specs)
     output_filename = f"{args.omop_table}.sql"
     initial_request_characters = preflight.initial_request_characters
@@ -205,13 +206,7 @@ def main():
             f"{initial_request_characters} / "
             f"{maximum_prompt_characters} characters"
         )
-        readiness_blockers = []
-        if pending_reviews:
-            readiness_blockers.append(
-                "pending reviews: " + ", ".join(pending_reviews)
-            )
-        if input_limit_exceeded:
-            readiness_blockers.append("initial request exceeds input limit")
+        readiness_blockers = generation_readiness_blockers(preflight)
         if readiness_blockers:
             print(
                 "Generation readiness: blocked by "

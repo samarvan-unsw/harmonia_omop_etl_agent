@@ -1,5 +1,6 @@
 import copy
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 import yaml
@@ -8,6 +9,7 @@ from agent.contracts import AgentConfig
 from agent.preflight import (
     build_generation_preflight,
     configured_output_token_ceiling,
+    generation_readiness_blockers,
 )
 from agent.validation import validate_specs
 
@@ -43,6 +45,30 @@ class GenerationPreflightTest(unittest.TestCase):
         self.assertEqual(result.output_token_ceiling, 1600)
         self.assertIn("race_concept_id", result.pending_reviews)
         self.assertFalse(result.generation_ready)
+
+    def test_reports_exact_actionable_readiness_blockers(self):
+        result = build_generation_preflight(
+            "person",
+            self.specs,
+            self.config,
+            max_iterations=2,
+        )
+        limited = replace(
+            result,
+            input_limit_exceeded=True,
+            maximum_initial_prompt_characters=(
+                result.initial_request_characters - 100
+            ),
+        )
+
+        blockers = generation_readiness_blockers(limited)
+
+        self.assertIn("race_concept_id", blockers[0])
+        self.assertIn(
+            str(result.initial_request_characters),
+            blockers[1],
+        )
+        self.assertIn("by 100", blockers[1])
 
     def test_rejects_non_positive_generation_attempts(self):
         with self.assertRaisesRegex(

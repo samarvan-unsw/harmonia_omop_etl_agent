@@ -204,9 +204,66 @@ class MappingRuleValidationTest(unittest.TestCase):
 
         with self.assertRaisesRegex(
             SpecValidationError,
-            "blank transformation requires exactly one source field",
+            "blank transformation with multiple source fields requires "
+            "one field per declared union_all model",
         ):
             validate_specs("person", self.specs_dir)
+
+    def test_union_all_allows_one_direct_source_field_per_model(self):
+        """A union branch may directly map its corresponding source field."""
+        source_path = (
+            self.specs_dir / "source_schema" / "cai_01_patient.yml"
+        )
+        historical_source = yaml.safe_load(
+            source_path.read_text(encoding="utf-8")
+        )
+        historical_source["models"][0]["name"] = (
+            "cai_01_patient_history"
+        )
+        (
+            self.specs_dir
+            / "source_schema"
+            / "cai_01_patient_history.yml"
+        ).write_text(
+            yaml.safe_dump(historical_source, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        mapping_path = self.specs_dir / "mappings" / "person.yml"
+        mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
+        mapping["source_models"].append("cai_01_patient_history")
+        mapping["union_all"] = [
+            "cai_01_patient",
+            "cai_01_patient_history",
+        ]
+        year_mapping = next(
+            field
+            for field in mapping["fields"]
+            if field["target_field"] == "year_of_birth"
+        )
+        year_mapping["action"] = "derive"
+        year_mapping["source_fields"].append(
+            {
+                "model": "cai_01_patient_history",
+                "field": "year_of_birth",
+            }
+        )
+        year_mapping["transformation"] = ""
+        mapping_path.write_text(
+            yaml.safe_dump(mapping, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        result = validate_specs("person", self.specs_dir)
+
+        self.assertEqual(
+            result.mapping.union_all,
+            ["cai_01_patient", "cai_01_patient_history"],
+        )
+        self.assertIn(
+            "## UNION ALL source models",
+            build_context_from_specs(result),
+        )
 
     def test_pending_review_fields_are_reported(self):
         """Structurally valid pending reviews should remain visible."""
