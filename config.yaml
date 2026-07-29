@@ -10,6 +10,15 @@ max_initial_prompt_characters: 12000
 # Disable automatic SDK retries while development spending is tightly controlled.
 max_api_retries: 0
 
+# Hard bounds for project-level choices submitted through the UI.
+project_limits:
+  allowed_models:
+    - gpt-5.3-codex
+  maximum_output_tokens_per_request: 4000
+  maximum_initial_prompt_characters: 50000
+  maximum_generation_attempts: 2
+  maximum_api_retries: 2
+
 source:
   reference_style: dbt_ref  # relation | dbt_ref | dbt_source
 

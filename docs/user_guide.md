@@ -73,6 +73,14 @@ max_output_tokens: 800
 max_initial_prompt_characters: 12000
 max_api_retries: 0
 
+project_limits:
+  allowed_models:
+    - gpt-5.3-codex
+  maximum_output_tokens_per_request: 4000
+  maximum_initial_prompt_characters: 50000
+  maximum_generation_attempts: 2
+  maximum_api_retries: 2
+
 source:
   reference_style: dbt_ref
 
@@ -371,6 +379,14 @@ Also review:
 - SQL dialect and output format.
 - Target output path.
 - Initial request size.
+
+The initial request display is `characters used / configured character limit`.
+Context characters are included in that request and are not a separate limit.
+The maximum run output is calculated as:
+
+```text
+output tokens per response × attempts × (automatic retries + 1)
+```
 
 ## 10. Generate SQL
 

@@ -90,6 +90,29 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    async def test_lists_safe_project_generation_options(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/generation-options",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["provider"], "codex")
+        self.assertIn("gpt-5.3-codex", result["allowed_models"])
+        self.assertEqual(
+            result["maximum_output_tokens_per_request"],
+            4000,
+        )
+        self.assertEqual(
+            result["maximum_initial_prompt_characters"],
+            50000,
+        )
+
     async def test_lists_complete_target_catalog_as_json(self):
         with patch.dict(
             os.environ,
@@ -260,11 +283,16 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Pending mapping reviews", result["blockers"][0])
 
     async def test_preflight_applies_safe_project_generation_settings(self):
+        self.payload["max_iterations"] = 1
         self.payload["generation_settings"] = {
             "sql_dialect": "postgres",
             "output_format": "sql",
             "source_reference_style": "relation",
             "source_name": None,
+            "model": "gpt-5.3-codex",
+            "maximum_output_tokens_per_request": 600,
+            "maximum_initial_prompt_characters": 30000,
+            "automatic_api_retries": 1,
         }
 
         with patch.dict(
@@ -282,6 +310,42 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["sql_dialect"], "postgres")
         self.assertEqual(result["output_format"], "sql")
         self.assertEqual(result["source_reference_style"], "relation")
+        self.assertEqual(result["model"], "gpt-5.3-codex")
+        self.assertEqual(
+            result["maximum_output_tokens_per_request"],
+            600,
+        )
+        self.assertEqual(result["automatic_api_retries"], 1)
+        self.assertEqual(result["maximum_generation_attempts"], 1)
+        self.assertEqual(result["worst_case_output_tokens"], 1200)
+        self.assertEqual(
+            result["maximum_initial_prompt_characters"],
+            30000,
+        )
+
+    async def test_preflight_rejects_project_setting_above_agent_limit(self):
+        self.payload["generation_settings"] = {
+            "sql_dialect": "postgres",
+            "output_format": "sql",
+            "source_reference_style": "relation",
+            "source_name": None,
+            "maximum_output_tokens_per_request": 4001,
+        }
+
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/preflight",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result["valid"])
+        self.assertIn("agent limit of 4000", result["errors"][0])
 
     async def test_rejects_incompatible_project_generation_settings(self):
         self.payload["generation_settings"] = {

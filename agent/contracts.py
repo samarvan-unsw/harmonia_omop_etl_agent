@@ -52,6 +52,31 @@ class OutputConfig(StrictModel):
     dialect: Literal["snowflake", "postgres", "athena", "bigquery"]
 
 
+class ProjectLimitsConfig(StrictModel):
+    """Server-owned bounds for user-selectable generation settings."""
+
+    allowed_models: list[str] = Field(min_length=1)
+    maximum_output_tokens_per_request: int = Field(ge=100, le=20_000)
+    maximum_initial_prompt_characters: int = Field(
+        ge=1_000,
+        le=1_000_000,
+    )
+    maximum_generation_attempts: int = Field(ge=1, le=2)
+    maximum_api_retries: int = Field(ge=0, le=2)
+
+    @field_validator("allowed_models")
+    @classmethod
+    def validate_allowed_models(cls, value: list[str]) -> list[str]:
+        """Reject blank or duplicate model identifiers."""
+        normalized = [model.strip() for model in value]
+        if (
+            any(not model or len(model) > 100 for model in normalized)
+            or len(normalized) != len(set(normalized))
+        ):
+            raise ValueError("allowed_models must be unique non-empty values")
+        return normalized
+
+
 class AgentConfig(StrictModel):
     """Root structure of config.yaml."""
 
@@ -62,6 +87,7 @@ class AgentConfig(StrictModel):
     max_api_retries: int = Field(ge=0, le=2)
     source: SourceConfig
     output: OutputConfig
+    project_limits: ProjectLimitsConfig
 
     @model_validator(mode="after")
     def validate_compatibility(self) -> "AgentConfig":
@@ -72,6 +98,30 @@ class AgentConfig(StrictModel):
         ):
             raise ValueError(
                 "plain SQL output requires source.reference_style=relation"
+            )
+        if self.model not in self.project_limits.allowed_models:
+            raise ValueError("model must be included in allowed_models")
+        if (
+            self.max_output_tokens
+            > self.project_limits.maximum_output_tokens_per_request
+        ):
+            raise ValueError(
+                "max_output_tokens exceeds the project setting maximum"
+            )
+        if (
+            self.max_initial_prompt_characters
+            > self.project_limits.maximum_initial_prompt_characters
+        ):
+            raise ValueError(
+                "max_initial_prompt_characters exceeds the project setting "
+                "maximum"
+            )
+        if (
+            self.max_api_retries
+            > self.project_limits.maximum_api_retries
+        ):
+            raise ValueError(
+                "max_api_retries exceeds the project setting maximum"
             )
         return self
 

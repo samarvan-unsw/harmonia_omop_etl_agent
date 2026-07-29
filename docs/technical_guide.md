@@ -63,6 +63,7 @@ it statically without connecting to a warehouse.
 - Automatic retry limit.
 - SQL dialect and output format.
 - Source relation reference style.
+- Project model allowlist and hard limits for UI-supplied generation controls.
 
 `.env` contains secrets:
 
@@ -457,6 +458,8 @@ only the explicitly confirmed generation endpoint may do so.
 ### Endpoints
 
 - `GET /health` provides unauthenticated liveness.
+- `GET /v1/generation-options` returns the safe model allowlist and hard
+  project-setting bounds.
 - `POST /v1/validate` accepts source-schema and mapping YAML, loads the
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/preflight` performs the same validation, then uses the agent-owned
@@ -475,17 +478,22 @@ tokens.
 
 ### Project-scoped generation settings
 
-Preflight and generation requests may include these safe SQL-output choices:
+Preflight and generation requests may include these bounded project choices:
 
+- An allowlisted model.
+- Initial-request character limit.
+- Output tokens per API response.
+- Maximum generation attempts.
+- Automatic API retries per attempt.
 - SQL dialect.
 - Output format.
 - Source reference style.
 - dbt source name, when `dbt_source` is selected.
 
-The API validates compatibility before applying them to that request. It does
-not allow clients to override the provider, model, prompt limits, output-token
-limits, attempt count or retry policy. Those controls remain agent-owned in
-`config.yaml`, so the UI cannot weaken cost and safety limits.
+The API validates compatibility before applying them to that request.
+`config.yaml` retains the provider, model allowlist and hard maxima, so a
+project cannot weaken the deployed service safeguards. Context size, initial
+request usage and the total output-token ceiling remain calculated values.
 
 ## 6B. `agent/preflight.py`
 
@@ -951,9 +959,10 @@ runs generate the same OMOP table concurrently, the last promotion wins.
 
 ### `config.yaml`
 
-Controls provider, model, limits, source-reference style, output format and SQL
-dialect. HTTP clients may override only the safe SQL-output choices listed in
-the API section, and only for the current request.
+Controls provider defaults, project model allowlist, hard limits,
+source-reference style, output format and SQL dialect. HTTP clients may apply
+only bounded project choices listed in the API section and only for the current
+request.
 
 ### `.env`
 

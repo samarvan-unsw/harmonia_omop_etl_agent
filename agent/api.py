@@ -41,6 +41,8 @@ MAXIMUM_SPECIFICATION_BYTES = 2 * 1024 * 1024
 MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
 MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
+MINIMUM_OUTPUT_TOKENS_PER_REQUEST = 100
+MINIMUM_INITIAL_PROMPT_CHARACTERS = 1_000
 GENERATION_SEMAPHORE = BoundedSemaphore(value=1)
 
 OmopTable = Annotated[
@@ -202,6 +204,28 @@ class ProjectGenerationSettings(StrictApiModel):
         str,
         StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"),
     ] | None = None
+    model: Annotated[
+        str,
+        StringConstraints(
+            pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            max_length=100,
+        ),
+    ] | None = None
+    maximum_output_tokens_per_request: int | None = Field(
+        default=None,
+        ge=MINIMUM_OUTPUT_TOKENS_PER_REQUEST,
+        le=MAXIMUM_API_RUN_OUTPUT_TOKENS,
+    )
+    maximum_initial_prompt_characters: int | None = Field(
+        default=None,
+        ge=MINIMUM_INITIAL_PROMPT_CHARACTERS,
+        le=1_000_000,
+    )
+    automatic_api_retries: int | None = Field(
+        default=None,
+        ge=0,
+        le=2,
+    )
 
     @model_validator(mode="after")
     def validate_compatibility(self) -> "ProjectGenerationSettings":
@@ -227,6 +251,20 @@ class ProjectGenerationSettings(StrictApiModel):
                 "source name is only allowed for dbt_source references"
             )
         return self
+
+
+class GenerationOptionsResponse(StrictApiModel):
+    """Agent-owned allowlists and hard bounds for project settings."""
+
+    provider: str
+    allowed_models: list[str]
+    minimum_output_tokens_per_request: int
+    maximum_output_tokens_per_request: int
+    minimum_initial_prompt_characters: int
+    maximum_initial_prompt_characters: int
+    maximum_generation_attempts: int
+    maximum_api_retries: int
+    maximum_run_output_tokens: int
 
 
 class PreflightRequest(ValidationRequest):
@@ -375,6 +413,45 @@ def health() -> dict[str, str]:
     return {"service": "cardiac-ai-omop-agent", "status": "ok"}
 
 
+@app.get(
+    "/v1/generation-options",
+    response_model=GenerationOptionsResponse,
+    dependencies=[Depends(require_api_token)],
+)
+def generation_options() -> GenerationOptionsResponse:
+    """Expose safe project choices without leaking secrets."""
+    try:
+        config = _load_agent_config()
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    limits = config["project_limits"]
+    return GenerationOptionsResponse(
+        provider=config["provider"],
+        allowed_models=limits["allowed_models"],
+        minimum_output_tokens_per_request=(
+            MINIMUM_OUTPUT_TOKENS_PER_REQUEST
+        ),
+        maximum_output_tokens_per_request=(
+            limits["maximum_output_tokens_per_request"]
+        ),
+        minimum_initial_prompt_characters=(
+            MINIMUM_INITIAL_PROMPT_CHARACTERS
+        ),
+        maximum_initial_prompt_characters=(
+            limits["maximum_initial_prompt_characters"]
+        ),
+        maximum_generation_attempts=(
+            limits["maximum_generation_attempts"]
+        ),
+        maximum_api_retries=limits["maximum_api_retries"],
+        maximum_run_output_tokens=MAXIMUM_API_RUN_OUTPUT_TOKENS,
+    )
+
+
 def _read_target_schema(path: Path) -> TargetSchemaDocument:
     """Load and validate one agent-owned target file."""
     try:
@@ -516,35 +593,78 @@ def _load_agent_config(
         )
         if not isinstance(raw_config, dict):
             raise ValueError("config.yaml must contain a mapping")
-        if generation_settings is not None:
-            source_config = raw_config.get("source")
-            output_config = raw_config.get("output")
-            if not isinstance(source_config, dict) or not isinstance(
-                output_config,
-                dict,
-            ):
-                raise ValueError(
-                    "config.yaml must define source and output mappings"
-                )
-            source_config["reference_style"] = (
-                generation_settings.source_reference_style
-            )
-            source_config["source_name"] = (
-                generation_settings.source_name
-            )
-            output_config["format"] = (
-                generation_settings.output_format
-            )
-            output_config["dialect"] = (
-                generation_settings.sql_dialect
-            )
-        return AgentConfig.model_validate(raw_config).model_dump()
+        config = AgentConfig.model_validate(raw_config).model_dump()
     except (
         OSError,
         ValueError,
         ValidationError,
         yaml.YAMLError,
     ) as error:
+        raise ValueError("Agent configuration is invalid.") from error
+
+    if generation_settings is None:
+        return config
+
+    limits = config["project_limits"]
+    if (
+        generation_settings.model is not None
+        and generation_settings.model not in limits["allowed_models"]
+    ):
+        raise ValueError(
+            "Selected model is not allowed. Choose one of: "
+            + ", ".join(limits["allowed_models"])
+        )
+    if (
+        generation_settings.maximum_output_tokens_per_request is not None
+        and generation_settings.maximum_output_tokens_per_request
+        > limits["maximum_output_tokens_per_request"]
+    ):
+        raise ValueError(
+            "Maximum output tokens per request exceeds the agent limit of "
+            f"{limits['maximum_output_tokens_per_request']}."
+        )
+    if (
+        generation_settings.maximum_initial_prompt_characters is not None
+        and generation_settings.maximum_initial_prompt_characters
+        > limits["maximum_initial_prompt_characters"]
+    ):
+        raise ValueError(
+            "Initial request character limit exceeds the agent maximum of "
+            f"{limits['maximum_initial_prompt_characters']}."
+        )
+    if (
+        generation_settings.automatic_api_retries is not None
+        and generation_settings.automatic_api_retries
+        > limits["maximum_api_retries"]
+    ):
+        raise ValueError(
+            "Automatic API retries exceed the agent maximum of "
+            f"{limits['maximum_api_retries']}."
+        )
+
+    config["source"]["reference_style"] = (
+        generation_settings.source_reference_style
+    )
+    config["source"]["source_name"] = generation_settings.source_name
+    config["output"]["format"] = generation_settings.output_format
+    config["output"]["dialect"] = generation_settings.sql_dialect
+    if generation_settings.model is not None:
+        config["model"] = generation_settings.model
+    if generation_settings.maximum_output_tokens_per_request is not None:
+        config["max_output_tokens"] = (
+            generation_settings.maximum_output_tokens_per_request
+        )
+    if generation_settings.maximum_initial_prompt_characters is not None:
+        config["max_initial_prompt_characters"] = (
+            generation_settings.maximum_initial_prompt_characters
+        )
+    if generation_settings.automatic_api_retries is not None:
+        config["max_api_retries"] = (
+            generation_settings.automatic_api_retries
+        )
+    try:
+        return AgentConfig.model_validate(config).model_dump()
+    except ValidationError as error:
         raise ValueError("Agent configuration is invalid.") from error
 
 
@@ -616,6 +736,19 @@ def preflight(request: PreflightRequest) -> PreflightResponse:
             omop_table=request.omop_table,
             errors=[str(error)],
         )
+    attempts_limit = config["project_limits"][
+        "maximum_generation_attempts"
+    ]
+    if request.max_iterations > attempts_limit:
+        return PreflightResponse(
+            valid=False,
+            generation_ready=False,
+            omop_table=request.omop_table,
+            errors=[
+                "Generation attempts exceed the agent maximum of "
+                f"{attempts_limit}."
+            ],
+        )
 
     result = build_generation_preflight(
         request.omop_table,
@@ -624,10 +757,22 @@ def preflight(request: PreflightRequest) -> PreflightResponse:
         request.max_iterations,
     )
     blockers = generation_readiness_blockers(result)
+    run_ceiling_exceeded = (
+        result.output_token_ceiling > MAXIMUM_API_RUN_OUTPUT_TOKENS
+    )
+    if run_ceiling_exceeded:
+        blockers += (
+            "Calculated maximum run output is "
+            f"{result.output_token_ceiling} tokens, exceeding the service "
+            f"limit of {MAXIMUM_API_RUN_OUTPUT_TOKENS}. Reduce output tokens "
+            "per response, attempts or retries.",
+        )
 
     return PreflightResponse(
         valid=True,
-        generation_ready=result.generation_ready,
+        generation_ready=(
+            result.generation_ready and not run_ceiling_exceeded
+        ),
         omop_table=request.omop_table,
         blockers=list(blockers),
         pending_reviews=list(result.pending_reviews),
@@ -666,6 +811,19 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             completed=False,
             omop_table=request.omop_table,
             errors=[str(error)],
+        )
+    attempts_limit = config["project_limits"][
+        "maximum_generation_attempts"
+    ]
+    if request.max_iterations > attempts_limit:
+        return GenerationResponse(
+            status="blocked",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=[
+                "Generation attempts exceed the agent maximum of "
+                f"{attempts_limit}."
+            ],
         )
 
     preflight_result = build_generation_preflight(

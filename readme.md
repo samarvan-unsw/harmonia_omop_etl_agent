@@ -146,6 +146,7 @@ Versioned endpoints:
 - `POST /v1/validate`
 - `POST /v1/preflight`
 - `POST /v1/generate`
+- `GET /v1/generation-options`
 - `GET /v1/target-schemas`
 
 The API token and OpenAI key remain server-side. API generation returns SQL
