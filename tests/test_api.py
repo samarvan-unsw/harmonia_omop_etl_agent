@@ -103,7 +103,15 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertEqual(result["provider"], "codex")
-        self.assertIn("gpt-5.3-codex", result["allowed_models"])
+        self.assertEqual(
+            result["allowed_models"],
+            [
+                "gpt-5.3-codex",
+                "gpt-5.6-terra",
+                "gpt-5.6-luna",
+                "gpt-5.6-sol",
+            ],
+        )
         self.assertEqual(
             result["maximum_output_tokens_per_request"],
             4000,
