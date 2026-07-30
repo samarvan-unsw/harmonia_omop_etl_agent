@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -77,6 +78,46 @@ class ProjectLimitsConfig(StrictModel):
         return normalized
 
 
+class ModelPricingConfig(StrictModel):
+    """Standard API token rates for one allowed model."""
+
+    input_usd_per_million_tokens: float = Field(gt=0, le=1_000)
+    cached_input_usd_per_million_tokens: float = Field(gt=0, le=1_000)
+    cache_write_input_usd_per_million_tokens: float = Field(
+        gt=0,
+        le=1_000,
+    )
+    output_usd_per_million_tokens: float = Field(gt=0, le=1_000)
+
+
+class PricingConfig(StrictModel):
+    """Versioned pricing snapshot used only for cost estimates."""
+
+    currency: Literal["USD"]
+    verified_on: date
+    models: dict[str, ModelPricingConfig] = Field(min_length=1)
+
+    @field_validator("models")
+    @classmethod
+    def validate_model_names(
+        cls,
+        value: dict[str, ModelPricingConfig],
+    ) -> dict[str, ModelPricingConfig]:
+        """Reject malformed model identifiers in the pricing registry."""
+        if any(
+            not model
+            or len(model) > 100
+            or not model[0].isalnum()
+            or any(
+                not (character.isalnum() or character in "._-")
+                for character in model
+            )
+            for model in value
+        ):
+            raise ValueError("pricing model identifiers are invalid")
+        return value
+
+
 class AgentConfig(StrictModel):
     """Root structure of config.yaml."""
 
@@ -88,6 +129,7 @@ class AgentConfig(StrictModel):
     source: SourceConfig
     output: OutputConfig
     project_limits: ProjectLimitsConfig
+    pricing: PricingConfig
 
     @model_validator(mode="after")
     def validate_compatibility(self) -> "AgentConfig":
@@ -101,6 +143,12 @@ class AgentConfig(StrictModel):
             )
         if self.model not in self.project_limits.allowed_models:
             raise ValueError("model must be included in allowed_models")
+        if set(self.project_limits.allowed_models) != set(
+            self.pricing.models
+        ):
+            raise ValueError(
+                "pricing models must exactly match allowed_models"
+            )
         if (
             self.max_output_tokens
             > self.project_limits.maximum_output_tokens_per_request

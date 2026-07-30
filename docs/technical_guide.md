@@ -148,6 +148,7 @@ The practical sequence is:
 | `agent.validation` | File and in-memory cross-specification validation | CLI, API, context and loop |
 | `agent.api` | Authenticated HTTP validation and preflight interface | UI or another server |
 | `agent.preflight` | Shared readiness, prompt-size and token-ceiling calculation | CLI and API |
+| `agent.costing` | Token-length and model-price cost estimates | Preflight, CLI and API |
 | `agent.context` | Prompt-ready representation of validated specs | CLI, API and loop |
 | `agent.prompts` | Fixed model instructions and data boundaries | CLI and loop |
 | `agent.input_guard` | Initial request-size protection | CLI and loop |
@@ -464,11 +465,11 @@ only the explicitly confirmed generation endpoint may do so.
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/preflight` performs the same validation, then uses the agent-owned
   config and prompts to report prompt size, SQL settings, attempt limits and
-  the worst-case output-token ceiling.
+  the worst-case output-token ceiling and estimated maximum API cost.
 - `POST /v1/generate` requires exact confirmation of the current token
   ceiling, runs one bounded generation and returns only validated SQL plus
-  measured usage. It does not return the internal transcript or overwrite the
-  CLI output file.
+  measured usage and its estimated cost. It does not return the internal
+  transcript or overwrite the CLI output file.
 
 Validation requests require a bearer token matching `AGENT_API_TOKEN`.
 Request documents and total request content have bounded sizes. Error
@@ -494,6 +495,7 @@ The API validates compatibility before applying them to that request.
 `config.yaml` retains the provider, model allowlist and hard maxima, so a
 project cannot weaken the deployed service safeguards. Context size, initial
 request usage and the total output-token ceiling remain calculated values.
+The dated pricing registry must exactly cover every allowlisted model.
 
 ## 6B. `agent/preflight.py`
 
@@ -506,9 +508,19 @@ provider or making an OpenAI request.
 ### Functions
 
 - `build_generation_preflight()` reports review blockers, prompt size and the
-  output-token ceiling for validated specifications.
+  output-token ceiling and conservative API cost estimate for validated
+  specifications.
 - `configured_output_token_ceiling()` applies the configured per-request
   output limit, generation attempts and API retry count.
+
+## 6C. `agent/costing.py`
+
+Uses a deterministic three-UTF-8-bytes-per-token estimate before generation,
+then applies the selected model's dated standard-tier pricing. Maximum cost
+assumes uncached or cache-write input, the complete output ceiling and all
+configured attempts. After generation it uses measured input, cached-input,
+cache-write and output token classes. Reasoning tokens are already included
+in provider output tokens and are not charged twice.
 
 ## 7. `agent/context.py`
 
@@ -620,9 +632,9 @@ Raises `InputSizeLimitError` when the count exceeds
 
 ### Design limitation
 
-This is a deterministic character-based guard, not a model tokenizer. It
-protects against accidental prompt growth but is not an exact input-token or
-cost estimate.
+The character guard remains the hard local size control. Costing separately
+uses a conservative token-length estimate; only provider usage after
+generation supplies measured token counts.
 
 ## 10. `agent/providers/base.py`
 
@@ -959,10 +971,10 @@ runs generate the same OMOP table concurrently, the last promotion wins.
 
 ### `config.yaml`
 
-Controls provider defaults, project model allowlist, hard limits,
-source-reference style, output format and SQL dialect. HTTP clients may apply
-only bounded project choices listed in the API section and only for the current
-request.
+Controls provider defaults, project model allowlist, hard limits, dated
+standard-tier pricing, source-reference style, output format and SQL dialect.
+HTTP clients may apply only bounded project choices listed in the API section
+and only for the current request.
 
 ### `.env`
 
@@ -1021,6 +1033,7 @@ change local CLI execution.
 | `tests/test_validation.py` | Cross-spec rules, reviews and generated mapping names |
 | `tests/test_api.py` | Authentication, validation, preflight, generation gates and redaction |
 | `tests/test_preflight.py` | Shared readiness, prompt size and token-ceiling calculation |
+| `tests/test_costing.py` | Token estimates, maximum cost and measured usage cost |
 | `tests/test_target_schemas.py` | Full OMOP catalog counts, versions, filenames and foreign keys |
 | `tests/test_source_schema_contract.py` | Source primary/foreign-key metadata contracts |
 
@@ -1080,7 +1093,8 @@ contract → validation → prompt context → output validation
   clinical semantics or data quality.
 - Candidate promotion protects prior output but does not provide multi-process
   locking.
-- Character-based input limits are predictable but not exact token estimates.
+- Preflight token and cost values are conservative estimates; provider usage
+  is measured, but the displayed price is still not an invoice.
 - Provider-neutral types simplify future adapters but still require
   vendor-specific message conversion.
 - Low output limits control spending but may truncate large tool calls.

@@ -288,6 +288,14 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["maximum_generation_attempts"], 2)
         self.assertEqual(result["worst_case_output_tokens"], 1600)
         self.assertGreater(result["initial_request_characters"], 0)
+        self.assertGreater(result["estimated_initial_input_tokens"], 0)
+        self.assertGreater(
+            result["estimated_maximum_input_tokens"],
+            result["estimated_initial_input_tokens"],
+        )
+        self.assertGreater(result["estimated_maximum_cost_usd"], 0)
+        self.assertEqual(result["cost_currency"], "USD")
+        self.assertEqual(result["pricing_verified_on"], "2026-07-30")
         self.assertIn("Pending mapping reviews", result["blockers"][0])
 
     async def test_preflight_applies_safe_project_generation_settings(self):
@@ -447,6 +455,10 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "done")
         self.assertEqual(result["output_sql"], "select 1 as person_id")
         self.assertEqual(result["usage"]["total_tokens"], 130)
+        self.assertEqual(result["estimated_actual_cost_usd"], 0.0005635)
+        self.assertGreater(result["estimated_maximum_cost_usd"], 0)
+        self.assertEqual(result["cost_currency"], "USD")
+        self.assertEqual(result["pricing_verified_on"], "2026-07-30")
         self.assertNotIn("transcript", result)
         run_agent.assert_called_once()
         self.assertFalse(

@@ -42,6 +42,12 @@ class GenerationPreflightTest(unittest.TestCase):
 
         self.assertGreater(result.context_characters, 0)
         self.assertGreater(result.initial_request_characters, 0)
+        self.assertGreater(result.estimated_initial_input_tokens, 0)
+        self.assertGreater(
+            result.estimated_maximum_input_tokens,
+            result.estimated_initial_input_tokens,
+        )
+        self.assertGreater(result.estimated_maximum_cost_usd, 0)
         self.assertEqual(result.output_token_ceiling, 1600)
         self.assertIn("race_concept_id", result.pending_reviews)
         self.assertFalse(result.generation_ready)

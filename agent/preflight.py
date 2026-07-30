@@ -1,7 +1,14 @@
 from dataclasses import dataclass
 
 from .context import build_context_from_specs
-from .input_guard import initial_request_character_count
+from .costing import (
+    estimate_serialized_tokens,
+    maximum_generation_cost,
+)
+from .input_guard import (
+    initial_request_character_count,
+    serialize_initial_request,
+)
 from .prompts import build_system_prompt, build_user_prompt
 from .tools import TOOL_SCHEMAS
 from .validation import ValidatedSpecs, pending_review_fields
@@ -16,6 +23,9 @@ class GenerationPreflight:
     initial_request_characters: int
     input_limit_exceeded: bool
     maximum_initial_prompt_characters: int
+    estimated_initial_input_tokens: int
+    estimated_maximum_input_tokens: int
+    estimated_maximum_cost_usd: float
     output_token_ceiling: int
     pending_reviews: tuple[str, ...]
 
@@ -81,6 +91,24 @@ def build_generation_preflight(
     maximum_characters = config["max_initial_prompt_characters"]
     reviews = pending_review_fields(specs)
     input_limit_exceeded = initial_characters > maximum_characters
+    estimated_input_tokens = estimate_serialized_tokens(
+        serialize_initial_request(
+            system_prompt,
+            user_prompt,
+            TOOL_SCHEMAS,
+        ),
+        config["model"],
+    )
+    output_token_ceiling = configured_output_token_ceiling(
+        config,
+        max_iterations,
+    )
+    cost_estimate = maximum_generation_cost(
+        config=config,
+        initial_input_tokens=estimated_input_tokens,
+        max_iterations=max_iterations,
+        maximum_output_tokens=output_token_ceiling,
+    )
 
     return GenerationPreflight(
         context_characters=len(context),
@@ -88,9 +116,11 @@ def build_generation_preflight(
         initial_request_characters=initial_characters,
         input_limit_exceeded=input_limit_exceeded,
         maximum_initial_prompt_characters=maximum_characters,
-        output_token_ceiling=configured_output_token_ceiling(
-            config,
-            max_iterations,
+        estimated_initial_input_tokens=estimated_input_tokens,
+        estimated_maximum_input_tokens=(
+            cost_estimate.maximum_input_tokens
         ),
+        estimated_maximum_cost_usd=cost_estimate.maximum_cost_usd,
+        output_token_ceiling=output_token_ceiling,
         pending_reviews=reviews,
     )

@@ -1,5 +1,6 @@
 import hmac
 import os
+from datetime import date
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Annotated, Literal
@@ -20,6 +21,7 @@ from pydantic import (
 )
 
 from .contracts import AgentConfig, TargetSchemaDocument
+from .costing import estimated_usage_cost_usd
 from .loop import run_agent_with_specs
 from .preflight import (
     build_generation_preflight,
@@ -295,6 +297,11 @@ class PreflightResponse(StrictApiModel):
     context_characters: int | None = None
     initial_request_characters: int | None = None
     maximum_initial_prompt_characters: int | None = None
+    estimated_initial_input_tokens: int | None = None
+    estimated_maximum_input_tokens: int | None = None
+    estimated_maximum_cost_usd: float | None = None
+    cost_currency: str | None = None
+    pricing_verified_on: date | None = None
 
 
 class GenerationRequest(PreflightRequest):
@@ -326,6 +333,10 @@ class GenerationResponse(StrictApiModel):
     iterations: int = 0
     output_token_ceiling: int | None = None
     model: str | None = None
+    estimated_maximum_cost_usd: float | None = None
+    estimated_actual_cost_usd: float | None = None
+    cost_currency: str | None = None
+    pricing_verified_on: date | None = None
     usage: GenerationUsage = Field(default_factory=GenerationUsage)
 
 
@@ -792,6 +803,17 @@ def preflight(request: PreflightRequest) -> PreflightResponse:
         maximum_initial_prompt_characters=(
             result.maximum_initial_prompt_characters
         ),
+        estimated_initial_input_tokens=(
+            result.estimated_initial_input_tokens
+        ),
+        estimated_maximum_input_tokens=(
+            result.estimated_maximum_input_tokens
+        ),
+        estimated_maximum_cost_usd=(
+            result.estimated_maximum_cost_usd
+        ),
+        cost_currency=config["pricing"]["currency"],
+        pricing_verified_on=config["pricing"]["verified_on"],
     )
 
 
@@ -844,6 +866,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
         )
 
     current_ceiling = preflight_result.output_token_ceiling
+    maximum_cost = preflight_result.estimated_maximum_cost_usd
+    cost_currency = config["pricing"]["currency"]
+    pricing_verified_on = config["pricing"]["verified_on"]
     if request.confirmed_output_token_ceiling != current_ceiling:
         return GenerationResponse(
             status="blocked",
@@ -856,6 +881,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             ],
             output_token_ceiling=current_ceiling,
             model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
         )
     if current_ceiling > MAXIMUM_API_RUN_OUTPUT_TOKENS:
         return GenerationResponse(
@@ -868,6 +896,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             ],
             output_token_ceiling=current_ceiling,
             model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
         )
 
     if not GENERATION_SEMAPHORE.acquire(blocking=False):
@@ -878,6 +909,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             errors=["Another generation request is already running."],
             output_token_ceiling=current_ceiling,
             model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
         )
 
     try:
@@ -896,6 +930,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             errors=["OpenAI authentication is not configured."],
             output_token_ceiling=current_ceiling,
             model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
         )
     except OpenAIError as error:
         return GenerationResponse(
@@ -905,6 +942,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             errors=[api_error_message(error)],
             output_token_ceiling=current_ceiling,
             model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
         )
     except (OSError, ValueError):
         return GenerationResponse(
@@ -914,6 +954,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             errors=["The agent could not process the generated output."],
             output_token_ceiling=current_ceiling,
             model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
         )
     finally:
         GENERATION_SEMAPHORE.release()
@@ -933,5 +976,12 @@ def generate(request: GenerationRequest) -> GenerationResponse:
         iterations=result.get("iterations", 0),
         output_token_ceiling=current_ceiling,
         model=config["model"],
+        estimated_maximum_cost_usd=maximum_cost,
+        estimated_actual_cost_usd=estimated_usage_cost_usd(
+            usage,
+            config,
+        ),
+        cost_currency=cost_currency,
+        pricing_verified_on=pricing_verified_on,
         usage=usage,
     )

@@ -84,6 +84,31 @@ project_limits:
   maximum_generation_attempts: 2
   maximum_api_retries: 2
 
+pricing:
+  currency: USD
+  verified_on: 2026-07-30
+  models:
+    gpt-5.3-codex:
+      input_usd_per_million_tokens: 1.75
+      cached_input_usd_per_million_tokens: 0.175
+      cache_write_input_usd_per_million_tokens: 1.75
+      output_usd_per_million_tokens: 14.00
+    gpt-5.6-terra:
+      input_usd_per_million_tokens: 2.50
+      cached_input_usd_per_million_tokens: 0.25
+      cache_write_input_usd_per_million_tokens: 3.125
+      output_usd_per_million_tokens: 15.00
+    gpt-5.6-luna:
+      input_usd_per_million_tokens: 1.00
+      cached_input_usd_per_million_tokens: 0.10
+      cache_write_input_usd_per_million_tokens: 1.25
+      output_usd_per_million_tokens: 6.00
+    gpt-5.6-sol:
+      input_usd_per_million_tokens: 5.00
+      cached_input_usd_per_million_tokens: 0.50
+      cache_write_input_usd_per_million_tokens: 6.25
+      output_usd_per_million_tokens: 30.00
+
 source:
   reference_style: dbt_ref
 
@@ -382,6 +407,8 @@ Also review:
 - SQL dialect and output format.
 - Target output path.
 - Initial request size.
+- Estimated initial and maximum input tokens.
+- Estimated maximum API cost and pricing verification date.
 
 The initial request display is `characters used / configured character limit`.
 Context characters are included in that request and are not a separate limit.
@@ -417,8 +444,9 @@ python -m agent.cli person \
   --max-run-output-tokens 1600
 ```
 
-The ceiling limits output tokens, not input-token charges. Keep automatic API
-retries disabled while controlling development spending.
+The cost shown by preflight is a conservative estimate, not a billing
+guarantee. It assumes the configured attempts and retries could be used.
+Keep automatic API retries disabled while controlling development spending.
 
 ## 11. Review the result
 
@@ -457,6 +485,7 @@ The log records:
 - Local validation feedback.
 - Number of successful API responses.
 - Input, cached-input, output, reasoning and total token usage.
+- Estimated API cost calculated from that measured usage.
 
 Logs are gitignored. Treat them as potentially sensitive operational data.
 

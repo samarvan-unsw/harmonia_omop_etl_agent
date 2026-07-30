@@ -22,6 +22,34 @@ project_limits:
   maximum_generation_attempts: 2
   maximum_api_retries: 2
 
+# Standard API pricing snapshot used for estimates only. Review these rates
+# against https://developers.openai.com/api/docs/models/compare whenever
+# models or prices change.
+pricing:
+  currency: USD
+  verified_on: 2026-07-30
+  models:
+    gpt-5.3-codex:
+      input_usd_per_million_tokens: 1.75
+      cached_input_usd_per_million_tokens: 0.175
+      cache_write_input_usd_per_million_tokens: 1.75
+      output_usd_per_million_tokens: 14.00
+    gpt-5.6-terra:
+      input_usd_per_million_tokens: 2.50
+      cached_input_usd_per_million_tokens: 0.25
+      cache_write_input_usd_per_million_tokens: 3.125
+      output_usd_per_million_tokens: 15.00
+    gpt-5.6-luna:
+      input_usd_per_million_tokens: 1.00
+      cached_input_usd_per_million_tokens: 0.10
+      cache_write_input_usd_per_million_tokens: 1.25
+      output_usd_per_million_tokens: 6.00
+    gpt-5.6-sol:
+      input_usd_per_million_tokens: 5.00
+      cached_input_usd_per_million_tokens: 0.50
+      cache_write_input_usd_per_million_tokens: 6.25
+      output_usd_per_million_tokens: 30.00
+
 source:
   reference_style: dbt_ref  # relation | dbt_ref | dbt_source
 

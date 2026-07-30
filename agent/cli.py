@@ -14,6 +14,7 @@ from openai import (
 from pydantic import ValidationError
 
 from .contracts import AgentConfig
+from .costing import estimated_usage_cost_usd
 from .loop import run_agent
 from .preflight import (
     build_generation_preflight,
@@ -21,6 +22,7 @@ from .preflight import (
     generation_readiness_blockers,
 )
 from .provider_errors import api_error_message
+from .providers.base import TokenUsage
 from .validation import (
     SpecValidationError,
     pending_review_fields,
@@ -206,6 +208,20 @@ def main():
             f"{initial_request_characters} / "
             f"{maximum_prompt_characters} characters"
         )
+        print(
+            "Estimated initial input: "
+            f"{preflight.estimated_initial_input_tokens} tokens"
+        )
+        print(
+            "Estimated maximum input: "
+            f"{preflight.estimated_maximum_input_tokens} tokens"
+        )
+        print(
+            "Estimated maximum API cost: "
+            f"${preflight.estimated_maximum_cost_usd:.6f} "
+            f"{config['pricing']['currency']} "
+            f"(pricing verified {config['pricing']['verified_on']})"
+        )
         readiness_blockers = generation_readiness_blockers(preflight)
         if readiness_blockers:
             print(
@@ -278,6 +294,21 @@ def main():
 
     print(f"Status: {result['status']} ({result['iterations']} iterations)")
     print(_format_usage(result["usage"]))
+    usage = result["usage"]
+    measured_usage = TokenUsage(
+        input_tokens=usage["input_tokens"],
+        cached_input_tokens=usage["cached_input_tokens"],
+        cache_write_input_tokens=usage["cache_write_input_tokens"],
+        output_tokens=usage["output_tokens"],
+        reasoning_output_tokens=usage["reasoning_output_tokens"],
+        total_tokens=usage["total_tokens"],
+    )
+    print(
+        "Estimated API cost: "
+        f"${estimated_usage_cost_usd(measured_usage, config):.6f} "
+        f"{config['pricing']['currency']} "
+        f"(pricing verified {config['pricing']['verified_on']})"
+    )
     print(f"Log: {log_path}")
     if result["status"] != "done":
         sys.exit(1)

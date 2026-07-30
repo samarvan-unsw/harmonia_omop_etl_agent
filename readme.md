@@ -75,8 +75,8 @@ Validate one OMOP table without an API call:
 python -m agent.cli person --validate-only
 ```
 
-Inspect generation readiness and the worst-case token ceiling without an API
-call:
+Inspect generation readiness, the worst-case token ceiling and the estimated
+maximum API cost without an API call:
 
 ```bash
 python -m agent.cli person --dry-run
