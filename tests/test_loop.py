@@ -247,6 +247,7 @@ class RunAgentTest(unittest.TestCase):
             generated_file = output_dir / "person.sql"
             self.assertTrue(generated_file.is_file())
             self.assertEqual(generated_file.read_text(encoding="utf-8"), sql)
+            self.assertTrue((output_dir / "person.yml").is_file())
             self.assertEqual(result["status"], "done")
             self.assertEqual(result["iterations"], 1)
             self.assertTrue(result["output_written"])
@@ -295,6 +296,13 @@ class RunAgentTest(unittest.TestCase):
 
             self.assertEqual(result["status"], "done")
             self.assertEqual(result["output_sql"], sql)
+            self.assertEqual(
+                [
+                    artifact["file_name"]
+                    for artifact in result["output_artifacts"]
+                ],
+                ["person.sql", "person.yml"],
+            )
             self.assertFalse((output_dir / "person.sql").exists())
             self.assertEqual(list(output_dir.glob(".*.candidate")), [])
 

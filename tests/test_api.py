@@ -421,6 +421,20 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             "status": "done",
             "iterations": 1,
             "output_sql": "select 1 as person_id",
+            "output_artifacts": [
+                {
+                    "file_name": "person.sql",
+                    "content": "select 1 as person_id",
+                    "media_type": "application/sql",
+                    "category": "transformation",
+                },
+                {
+                    "file_name": "create_tables.sql",
+                    "content": "create table person (person_id integer);",
+                    "media_type": "application/sql",
+                    "category": "ddl",
+                },
+            ],
             "usage": {
                 "successful_api_responses": 1,
                 "input_tokens": 100,
@@ -454,6 +468,10 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["completed"])
         self.assertEqual(result["status"], "done")
         self.assertEqual(result["output_sql"], "select 1 as person_id")
+        self.assertEqual(
+            [item["file_name"] for item in result["output_artifacts"]],
+            ["person.sql", "create_tables.sql"],
+        )
         self.assertEqual(result["usage"]["total_tokens"], 130)
         self.assertEqual(result["estimated_actual_cost_usd"], 0.0005635)
         self.assertGreater(result["estimated_maximum_cost_usd"], 0)

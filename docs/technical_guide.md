@@ -820,6 +820,15 @@ Enforce the output boundary and safe filename formats.
 Defines the strict JSON schemas sent to the model for `read_file` and
 `write_file`.
 
+## 13A. `agent/output_artifacts.py`
+
+Builds files that must never depend on a model prompt. dbt mode adds an
+enforced model-contract YAML for the selected target. Plain SQL mode adds the
+complete OMOP table, primary-key, foreign-key and index DDL bundle. PostgreSQL,
+Snowflake and BigQuery load checksum-verified OHDSI assets pinned to the same
+commit as the target catalog. Athena is generated from that catalog because
+OHDSI does not supply an Athena-specific DDL there.
+
 ## 14. `agent/sql_validation.py`
 
 ### Purpose
@@ -1000,9 +1009,9 @@ document and foreign key, then atomically replaces the catalog.
 
 ### `output/`
 
-Contains promoted SQL outputs and short-lived hidden candidates. Generated
-SQL is gitignored; a non-authoritative example is stored under
-`examples/generated/`.
+Contains promoted transformation SQL, dbt contract YAML or the static
+`ddl/` bundle, plus short-lived hidden candidates. Generated artifacts are
+gitignored; a non-authoritative example is stored under `examples/generated/`.
 
 ### `logs/`
 

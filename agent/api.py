@@ -322,6 +322,21 @@ class GenerationUsage(StrictApiModel):
     total_tokens: int = 0
 
 
+class GenerationArtifact(StrictApiModel):
+    """One generated file in a bounded output bundle."""
+
+    file_name: Annotated[
+        str,
+        StringConstraints(
+            pattern=r"^[A-Za-z_][A-Za-z0-9_]*\.(?:sql|yml)$",
+            max_length=255,
+        ),
+    ]
+    content: str = Field(min_length=1, max_length=1_000_000)
+    media_type: Literal["application/sql", "application/yaml"]
+    category: Literal["transformation", "dbt_contract", "ddl"]
+
+
 class GenerationResponse(StrictApiModel):
     """Bounded generation result for persistence by the calling UI."""
 
@@ -330,6 +345,10 @@ class GenerationResponse(StrictApiModel):
     omop_table: str
     errors: list[str] = Field(default_factory=list)
     output_sql: str | None = None
+    output_artifacts: list[GenerationArtifact] = Field(
+        default_factory=list,
+        max_length=5,
+    )
     iterations: int = 0
     output_token_ceiling: int | None = None
     model: str | None = None
@@ -973,6 +992,9 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             else _bounded_generation_diagnostics(result)
         ),
         output_sql=result.get("output_sql") if completed else None,
+        output_artifacts=(
+            result.get("output_artifacts", []) if completed else []
+        ),
         iterations=result.get("iterations", 0),
         output_token_ceiling=current_ceiling,
         model=config["model"],

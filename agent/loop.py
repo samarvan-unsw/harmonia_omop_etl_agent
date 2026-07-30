@@ -2,8 +2,10 @@ from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
+from . import tools as tool_module
 from .context import build_context_from_specs
 from .input_guard import enforce_initial_request_limit
+from .output_artifacts import build_output_artifacts, write_local_artifacts
 from .prompts import build_system_prompt, build_user_prompt
 from .providers import load_provider
 from .providers.base import TokenUsage
@@ -164,7 +166,17 @@ def run_agent_with_specs(
                             output_filename,
                             candidate_id=candidate_id,
                         )
+                        artifacts = build_output_artifacts(
+                            generated_sql=generated_sql,
+                            target_schema=specs.target_schema,
+                            output_format=config["output"]["format"],
+                            dialect=config["output"]["dialect"],
+                        )
                         if promote_output:
+                            write_local_artifacts(
+                                artifacts,
+                                output_dir=tool_module.OUTPUT_DIR,
+                            )
                             promote_file(
                                 output_filename,
                                 candidate_id=candidate_id,
@@ -194,6 +206,9 @@ def run_agent_with_specs(
                         "iterations": iteration,
                         "output_written": True,
                         "output_valid": True,
+                        "output_artifacts": [
+                            artifact.as_dict() for artifact in artifacts
+                        ],
                         "diagnostics": [],
                         "usage": {
                             "successful_api_responses": successful_api_responses,

@@ -57,7 +57,7 @@ Users should not normally edit:
 | File or folder | Purpose |
 | --- | --- |
 | `agent/` | Agent implementation |
-| `output/` | Generated SQL |
+| `output/` | Generated transformations and deterministic schema artifacts |
 | `logs/` | Generated run transcripts and token usage |
 | `tests/` | Automated tests for the agent implementation |
 
@@ -126,6 +126,20 @@ Supported source styles:
 
 Supported output formats are `sql` and `dbt`. Plain SQL requires
 `reference_style: relation`.
+
+The selected format controls the deterministic companion files:
+
+- `dbt`: `{table}.sql` and `{table}.yml`.
+- `sql`: `{table}.sql` plus `ddl/create_tables.sql`,
+  `ddl/primary_keys.sql`, `ddl/foreign_keys.sql` and `ddl/indexes.sql`.
+
+Only transformation SQL uses the AI provider. PostgreSQL, Snowflake and
+BigQuery DDL is copied from pinned OHDSI assets. Athena DDL and dbt YAML are
+generated deterministically from the pinned target schemas.
+
+The official assets retain the `@cdmDatabaseSchema` placeholder; render it
+with the deployment schema before execution. Athena also requires
+environment-specific S3 `LOCATION` clauses.
 
 Supported dialects are `snowflake`, `postgres`, `athena` and `bigquery`.
 
@@ -450,14 +464,15 @@ Keep automatic API retries disabled while controlling development spending.
 
 ## 11. Review the result
 
-A successful `person` run creates or replaces:
+A successful `person` run always creates or replaces:
 
 ```text
 output/person.sql
 ```
 
-The file is promoted only after local SQL validation passes. A failed run does
-not replace the last valid output.
+dbt output also creates `output/person.yml`. Plain SQL output refreshes the
+four files under `output/ddl/`. Files are promoted only after local SQL
+validation passes. A failed run does not replace the last valid transformation.
 
 Review the generated SQL for:
 

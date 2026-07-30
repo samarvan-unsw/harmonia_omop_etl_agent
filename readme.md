@@ -1,8 +1,8 @@
 # CardiacAI OMOP SQL Agent
 
 A bounded Python agent that converts validated source-schema and
-source-to-OMOP mapping specifications into one statically validated SQL file
-per OMOP CDM 5.4 table.
+source-to-OMOP mapping specifications into validated transformation SQL and
+deterministic schema artifacts for OMOP CDM 5.4.
 
 The repository supports two independent entry points:
 
@@ -26,7 +26,7 @@ source schemas + mapping + agent-owned OMOP target
                  static SQL validation
                          │
                          ▼
-                output/{table}.sql
+        output/{table}.sql + schema artifacts
 ```
 
 Validation and preflight never call OpenAI. Generation requires an explicit
@@ -37,10 +37,11 @@ request, retry and output-token limits.
 
 ```text
 agent/          Python application, contracts, API and generation loop
+assets/         Pinned official OHDSI DDL assets
 docs/           User, technical, deployment and roadmap documentation
 examples/       Non-authoritative example artifacts
 logs/           Gitignored owner-only local run logs
-output/         Gitignored generated SQL
+output/         Gitignored transformations, dbt contracts and DDL
 scripts/        Maintainer utilities
 specs/          Source schemas, mappings and OMOP target schemas
 tests/          Network-free unit and integration tests
@@ -149,8 +150,8 @@ Versioned endpoints:
 - `GET /v1/generation-options`
 - `GET /v1/target-schemas`
 
-The API token and OpenAI key remain server-side. API generation returns SQL
-without overwriting locally managed output files.
+The API token and OpenAI key remain server-side. API generation returns a
+bounded output bundle without overwriting locally managed output files.
 
 ## Documentation
 

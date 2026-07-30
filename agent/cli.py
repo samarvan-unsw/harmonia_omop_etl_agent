@@ -200,6 +200,13 @@ def main():
         print(f"Output format: {config['output']['format']}")
         print(f"Source reference style: {config['source']['reference_style']}")
         print(f"Target file: {output_path}")
+        if config["output"]["format"] == "dbt":
+            print(
+                "Companion file: "
+                f"{ROOT / 'output' / f'{args.omop_table}.yml'}"
+            )
+        else:
+            print(f"DDL directory: {ROOT / 'output' / 'ddl'}")
         print(
             f"Context size: {preflight.context_characters} characters"
         )
