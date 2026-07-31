@@ -6,6 +6,7 @@ import yaml
 
 from agent.contracts import TargetSchemaDocument
 from agent.output_artifacts import (
+    build_ddl_artifacts,
     build_output_artifacts,
     write_local_artifacts,
 )
@@ -83,6 +84,22 @@ class OutputArtifactsTests(unittest.TestCase):
         self.assertIn(
             "@cdmDatabaseSchema.person (gender_concept_id ASC)",
             by_name["indexes.sql"],
+        )
+
+    def test_standalone_ddl_bundle_has_no_transformation_artifact(self):
+        artifacts = build_ddl_artifacts(dialect="snowflake")
+
+        self.assertEqual(
+            [artifact.file_name for artifact in artifacts],
+            [
+                "create_tables.sql",
+                "primary_keys.sql",
+                "foreign_keys.sql",
+                "indexes.sql",
+            ],
+        )
+        self.assertTrue(
+            all(artifact.category == "ddl" for artifact in artifacts)
         )
 
     def test_athena_ddl_explains_unsupported_constraints_and_indexes(self):

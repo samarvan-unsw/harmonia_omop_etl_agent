@@ -427,9 +427,26 @@ def build_output_artifacts(
     if output_format != "sql":
         raise ValueError(f"Unsupported output format: {output_format}")
 
+    artifacts.extend(
+        build_ddl_artifacts(
+            dialect=dialect,
+            target_schema_dir=target_schema_dir,
+        )
+    )
+    return artifacts
+
+
+def build_ddl_artifacts(
+    *,
+    dialect: str,
+    target_schema_dir: Path = TARGET_SCHEMA_DIR,
+) -> list[OutputArtifact]:
+    """Build the complete OMOP DDL bundle without an AI request."""
+    if dialect not in {"postgres", "snowflake", "athena", "bigquery"}:
+        raise ValueError(f"Unsupported SQL dialect: {dialect}")
+
     if dialect in {"postgres", "snowflake", "bigquery"}:
-        artifacts.extend(_official_ddl_artifacts(dialect))
-        return artifacts
+        return _official_ddl_artifacts(dialect)
 
     schemas = _load_target_schemas(target_schema_dir)
     ddl_files = (
@@ -438,7 +455,7 @@ def build_output_artifacts(
         ("foreign_keys.sql", _foreign_keys_sql(schemas, dialect)),
         ("indexes.sql", _indexes_sql(schemas, dialect)),
     )
-    artifacts.extend(
+    return [
         OutputArtifact(
             file_name=file_name,
             content=content,
@@ -446,8 +463,7 @@ def build_output_artifacts(
             category="ddl",
         )
         for file_name, content in ddl_files
-    )
-    return artifacts
+    ]
 
 
 def write_local_artifacts(

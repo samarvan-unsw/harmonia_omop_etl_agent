@@ -1,14 +1,16 @@
 import hmac
 import os
+from io import BytesIO
 from datetime import date
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Annotated, Literal
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 import yaml
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from openai import OpenAIError
 from pydantic import (
     BaseModel,
@@ -23,6 +25,7 @@ from pydantic import (
 from .contracts import AgentConfig, TargetSchemaDocument
 from .costing import estimated_usage_cost_usd
 from .loop import run_agent_with_specs
+from .output_artifacts import build_ddl_artifacts
 from .preflight import (
     build_generation_preflight,
     generation_readiness_blockers,
@@ -43,6 +46,7 @@ MAXIMUM_SPECIFICATION_BYTES = 2 * 1024 * 1024
 MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
 MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
+MAXIMUM_DDL_BUNDLE_BYTES = 4 * 1024 * 1024
 MINIMUM_OUTPUT_TOKENS_PER_REQUEST = 100
 MINIMUM_INITIAL_PROMPT_CHARACTERS = 1_000
 GENERATION_SEMAPHORE = BoundedSemaphore(value=1)
@@ -54,6 +58,7 @@ OmopTable = Annotated[
         max_length=63,
     ),
 ]
+SqlDialect = Literal["snowflake", "postgres", "athena", "bigquery"]
 YamlFileName = Annotated[
     str,
     StringConstraints(
@@ -195,7 +200,7 @@ class TargetSchemaResponse(StrictApiModel):
 class ProjectGenerationSettings(StrictApiModel):
     """Safe project choices layered over agent-owned configuration."""
 
-    sql_dialect: Literal["snowflake", "postgres", "athena", "bigquery"]
+    sql_dialect: SqlDialect
     output_format: Literal["sql", "dbt"]
     source_reference_style: Literal[
         "relation",
@@ -479,6 +484,60 @@ def generation_options() -> GenerationOptionsResponse:
         ),
         maximum_api_retries=limits["maximum_api_retries"],
         maximum_run_output_tokens=MAXIMUM_API_RUN_OUTPUT_TOKENS,
+    )
+
+
+def _build_ddl_zip(sql_dialect: SqlDialect) -> bytes:
+    """Return a deterministic, bounded archive of static OMOP DDL."""
+    artifacts = build_ddl_artifacts(dialect=sql_dialect)
+    buffer = BytesIO()
+    with ZipFile(
+        buffer,
+        mode="w",
+        compression=ZIP_DEFLATED,
+        compresslevel=9,
+    ) as archive:
+        for artifact in artifacts:
+            entry = ZipInfo(
+                filename=artifact.file_name,
+                date_time=(1980, 1, 1, 0, 0, 0),
+            )
+            entry.compress_type = ZIP_DEFLATED
+            entry.external_attr = 0o644 << 16
+            archive.writestr(entry, artifact.content.encode("utf-8"))
+
+    content = buffer.getvalue()
+    if not content or len(content) > MAXIMUM_DDL_BUNDLE_BYTES:
+        raise ValueError("The DDL bundle exceeds the service limit.")
+    return content
+
+
+@app.get(
+    "/v1/ddl/{sql_dialect}",
+    response_class=Response,
+    dependencies=[Depends(require_api_token)],
+)
+def ddl_bundle(sql_dialect: SqlDialect) -> Response:
+    """Download deterministic OMOP DDL without calling an AI provider."""
+    try:
+        content = _build_ddl_zip(sql_dialect)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "Content-Disposition": (
+                "attachment; filename="
+                f'"omop_cdm_5_4_{sql_dialect}_ddl.zip"'
+            ),
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

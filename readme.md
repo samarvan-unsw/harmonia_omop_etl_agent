@@ -148,10 +148,13 @@ Versioned endpoints:
 - `POST /v1/preflight`
 - `POST /v1/generate`
 - `GET /v1/generation-options`
+- `GET /v1/ddl/{sql_dialect}`
 - `GET /v1/target-schemas`
 
 The API token and OpenAI key remain server-side. API generation returns a
 bounded output bundle without overwriting locally managed output files.
+The DDL endpoint returns the four deterministic OMOP DDL files as a ZIP and
+does not require mappings, call OpenAI or consume model tokens.
 
 ## Documentation
 

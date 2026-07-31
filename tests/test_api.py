@@ -1,7 +1,9 @@
 import os
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+from zipfile import ZipFile
 
 import yaml
 from httpx import ASGITransport, AsyncClient
@@ -149,6 +151,70 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(person["field_count"], 18)
         self.assertEqual(person["cdm_schema"], "CDM")
+
+    async def test_downloads_deterministic_ddl_without_generation(self):
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            first = await self.client.get(
+                "/v1/ddl/postgres",
+                headers=self.headers,
+            )
+            second = await self.client.get(
+                "/v1/ddl/postgres",
+                headers=self.headers,
+            )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(
+            first.headers["content-type"],
+            "application/zip",
+        )
+        self.assertIn(
+            "omop_cdm_5_4_postgres_ddl.zip",
+            first.headers["content-disposition"],
+        )
+        self.assertEqual(first.content, second.content)
+        with ZipFile(BytesIO(first.content)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                [
+                    "create_tables.sql",
+                    "primary_keys.sql",
+                    "foreign_keys.sql",
+                    "indexes.sql",
+                ],
+            )
+            self.assertIn(
+                "CREATE TABLE @cdmDatabaseSchema.person",
+                archive.read("create_tables.sql").decode("utf-8"),
+            )
+        run_agent.assert_not_called()
+
+    async def test_ddl_download_requires_bearer_token(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get("/v1/ddl/postgres")
+
+        self.assertEqual(response.status_code, 401)
+
+    async def test_ddl_download_rejects_unknown_dialect(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/ddl/oracle",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 422)
 
     async def test_returns_structured_target_schema_details(self):
         with patch.dict(
