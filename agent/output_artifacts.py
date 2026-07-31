@@ -469,11 +469,29 @@ def build_ddl_artifacts(
 def build_dbt_schema_artifacts(
     *,
     dialect: str,
+    target_tables: set[str] | None = None,
     target_schema_dir: Path = TARGET_SCHEMA_DIR,
 ) -> list[OutputArtifact]:
-    """Build one deterministic dbt model contract per OMOP table."""
+    """Build deterministic dbt contracts for all or selected OMOP tables."""
     if dialect not in {"postgres", "snowflake", "athena", "bigquery"}:
         raise ValueError(f"Unsupported SQL dialect: {dialect}")
+
+    schemas = _load_target_schemas(target_schema_dir)
+    if target_tables is not None:
+        known_tables = {schema.target_table for schema in schemas}
+        unknown_tables = sorted(target_tables - known_tables)
+        if unknown_tables:
+            raise ValueError(
+                "Unknown OMOP target tables: "
+                + ", ".join(unknown_tables)
+            )
+        schemas = [
+            schema
+            for schema in schemas
+            if schema.target_table in target_tables
+        ]
+        if not schemas:
+            raise ValueError("Select at least one OMOP target table.")
 
     return [
         OutputArtifact(
@@ -482,7 +500,7 @@ def build_dbt_schema_artifacts(
             media_type="application/yaml",
             category="dbt_contract",
         )
-        for schema in _load_target_schemas(target_schema_dir)
+        for schema in schemas
     ]
 
 
@@ -490,6 +508,7 @@ def build_schema_artifacts(
     *,
     output_format: str,
     dialect: str,
+    target_tables: set[str] | None = None,
     target_schema_dir: Path = TARGET_SCHEMA_DIR,
 ) -> list[OutputArtifact]:
     """Build a complete no-AI schema bundle for SQL or dbt projects."""
@@ -501,6 +520,7 @@ def build_schema_artifacts(
     if output_format == "dbt":
         return build_dbt_schema_artifacts(
             dialect=dialect,
+            target_tables=target_tables,
             target_schema_dir=target_schema_dir,
         )
     raise ValueError(f"Unsupported output format: {output_format}")

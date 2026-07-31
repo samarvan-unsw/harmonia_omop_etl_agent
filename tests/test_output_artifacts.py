@@ -124,6 +124,27 @@ class OutputArtifactsTests(unittest.TestCase):
             "INT64",
         )
 
+    def test_standalone_dbt_bundle_can_filter_target_tables(self):
+        artifacts = build_dbt_schema_artifacts(
+            dialect="postgres",
+            target_tables={"visit_occurrence", "person"},
+        )
+
+        self.assertEqual(
+            [artifact.file_name for artifact in artifacts],
+            ["person.yml", "visit_occurrence.yml"],
+        )
+
+    def test_standalone_dbt_bundle_rejects_unknown_target_table(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "Unknown OMOP target tables: imaginary_table",
+        ):
+            build_dbt_schema_artifacts(
+                dialect="postgres",
+                target_tables={"imaginary_table"},
+            )
+
     def test_athena_ddl_explains_unsupported_constraints_and_indexes(self):
         artifacts = build_output_artifacts(
             generated_sql="select 1 as person_id",

@@ -8,7 +8,15 @@ from typing import Annotated, Literal
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 import yaml
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from openai import OpenAIError
@@ -491,11 +499,13 @@ def generation_options() -> GenerationOptionsResponse:
 def _build_schema_bundle_zip(
     output_format: SchemaOutputFormat,
     sql_dialect: SqlDialect,
+    target_tables: set[str] | None = None,
 ) -> bytes:
     """Return a deterministic, bounded archive of static OMOP schemas."""
     artifacts = build_schema_artifacts(
         output_format=output_format,
         dialect=sql_dialect,
+        target_tables=target_tables,
     )
     buffer = BytesIO()
     with ZipFile(
@@ -527,16 +537,33 @@ def _build_schema_bundle_zip(
 def schema_bundle(
     output_format: SchemaOutputFormat,
     sql_dialect: SqlDialect,
+    tables: Annotated[list[OmopTable] | None, Query()] = None,
 ) -> Response:
-    """Download complete SQL DDL or dbt contracts without using AI."""
+    """Download SQL DDL or selected dbt contracts without using AI."""
+    if tables and output_format != "dbt":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Table selection is only supported for dbt bundles.",
+        )
+    if tables and len(set(tables)) > 39:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Select no more than 39 OMOP target tables.",
+        )
+
     try:
         content = _build_schema_bundle_zip(
             output_format,
             sql_dialect,
+            set(tables) if tables else None,
         )
     except ValueError as error:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_CONTENT
+                if tables
+                else status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
             detail=str(error),
         ) from error
 

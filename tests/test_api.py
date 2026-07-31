@@ -236,6 +236,38 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             )
         run_agent.assert_not_called()
 
+    async def test_downloads_selected_dbt_contracts_in_cdm_order(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                (
+                    "/v1/schema-bundle/dbt/postgres"
+                    "?tables=visit_occurrence&tables=person"
+                ),
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        with ZipFile(BytesIO(response.content)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                ["person.yml", "visit_occurrence.yml"],
+            )
+
+    async def test_dbt_bundle_rejects_unknown_target_table(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/schema-bundle/dbt/postgres?tables=imaginary_table",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 422)
+
     async def test_ddl_download_rejects_unknown_dialect(self):
         with patch.dict(
             os.environ,

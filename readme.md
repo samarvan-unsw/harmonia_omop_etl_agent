@@ -156,7 +156,9 @@ The API token and OpenAI key remain server-side. API generation returns a
 bounded output bundle without overwriting locally managed output files.
 The schema-bundle endpoint returns either the four deterministic OMOP DDL
 files for `sql` output or one dbt model-contract YAML per OMOP table for `dbt`
-output. It does not require mappings, call OpenAI or consume model tokens.
+output. Repeated `tables` query parameters can limit dbt output to selected
+targets; omitting them returns all 39. It does not call OpenAI or consume model
+tokens.
 The `/v1/ddl` route remains as a backward-compatible SQL-only endpoint.
 
 ## Documentation
