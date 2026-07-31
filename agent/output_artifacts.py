@@ -466,6 +466,46 @@ def build_ddl_artifacts(
     ]
 
 
+def build_dbt_schema_artifacts(
+    *,
+    dialect: str,
+    target_schema_dir: Path = TARGET_SCHEMA_DIR,
+) -> list[OutputArtifact]:
+    """Build one deterministic dbt model contract per OMOP table."""
+    if dialect not in {"postgres", "snowflake", "athena", "bigquery"}:
+        raise ValueError(f"Unsupported SQL dialect: {dialect}")
+
+    return [
+        OutputArtifact(
+            file_name=f"{schema.target_table}.yml",
+            content=_dbt_model_yml(schema, dialect),
+            media_type="application/yaml",
+            category="dbt_contract",
+        )
+        for schema in _load_target_schemas(target_schema_dir)
+    ]
+
+
+def build_schema_artifacts(
+    *,
+    output_format: str,
+    dialect: str,
+    target_schema_dir: Path = TARGET_SCHEMA_DIR,
+) -> list[OutputArtifact]:
+    """Build a complete no-AI schema bundle for SQL or dbt projects."""
+    if output_format == "sql":
+        return build_ddl_artifacts(
+            dialect=dialect,
+            target_schema_dir=target_schema_dir,
+        )
+    if output_format == "dbt":
+        return build_dbt_schema_artifacts(
+            dialect=dialect,
+            target_schema_dir=target_schema_dir,
+        )
+    raise ValueError(f"Unsupported output format: {output_format}")
+
+
 def write_local_artifacts(
     artifacts: list[OutputArtifact],
     output_dir: Path = OUTPUT_DIR,

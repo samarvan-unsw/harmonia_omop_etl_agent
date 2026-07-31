@@ -204,6 +204,38 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    async def test_downloads_complete_dbt_contract_bundle_without_generation(
+        self,
+    ):
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.get(
+                "/v1/schema-bundle/dbt/bigquery",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "omop_cdm_5_4_bigquery_dbt_contracts.zip",
+            response.headers["content-disposition"],
+        )
+        with ZipFile(BytesIO(response.content)) as archive:
+            self.assertEqual(len(archive.namelist()), 39)
+            self.assertEqual(archive.namelist()[0], "person.yml")
+            contract = yaml.safe_load(
+                archive.read("person.yml").decode("utf-8")
+            )
+            self.assertEqual(
+                contract["models"][0]["columns"][0]["data_type"],
+                "INT64",
+            )
+        run_agent.assert_not_called()
+
     async def test_ddl_download_rejects_unknown_dialect(self):
         with patch.dict(
             os.environ,
@@ -211,6 +243,18 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         ):
             response = await self.client.get(
                 "/v1/ddl/oracle",
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 422)
+
+    async def test_schema_bundle_rejects_unknown_output_format(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.get(
+                "/v1/schema-bundle/csv/postgres",
                 headers=self.headers,
             )
 

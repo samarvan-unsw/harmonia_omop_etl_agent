@@ -25,7 +25,7 @@ from pydantic import (
 from .contracts import AgentConfig, TargetSchemaDocument
 from .costing import estimated_usage_cost_usd
 from .loop import run_agent_with_specs
-from .output_artifacts import build_ddl_artifacts
+from .output_artifacts import build_schema_artifacts
 from .preflight import (
     build_generation_preflight,
     generation_readiness_blockers,
@@ -46,7 +46,7 @@ MAXIMUM_SPECIFICATION_BYTES = 2 * 1024 * 1024
 MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
 MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
-MAXIMUM_DDL_BUNDLE_BYTES = 4 * 1024 * 1024
+MAXIMUM_SCHEMA_BUNDLE_BYTES = 4 * 1024 * 1024
 MINIMUM_OUTPUT_TOKENS_PER_REQUEST = 100
 MINIMUM_INITIAL_PROMPT_CHARACTERS = 1_000
 GENERATION_SEMAPHORE = BoundedSemaphore(value=1)
@@ -59,6 +59,7 @@ OmopTable = Annotated[
     ),
 ]
 SqlDialect = Literal["snowflake", "postgres", "athena", "bigquery"]
+SchemaOutputFormat = Literal["sql", "dbt"]
 YamlFileName = Annotated[
     str,
     StringConstraints(
@@ -487,9 +488,15 @@ def generation_options() -> GenerationOptionsResponse:
     )
 
 
-def _build_ddl_zip(sql_dialect: SqlDialect) -> bytes:
-    """Return a deterministic, bounded archive of static OMOP DDL."""
-    artifacts = build_ddl_artifacts(dialect=sql_dialect)
+def _build_schema_bundle_zip(
+    output_format: SchemaOutputFormat,
+    sql_dialect: SqlDialect,
+) -> bytes:
+    """Return a deterministic, bounded archive of static OMOP schemas."""
+    artifacts = build_schema_artifacts(
+        output_format=output_format,
+        dialect=sql_dialect,
+    )
     buffer = BytesIO()
     with ZipFile(
         buffer,
@@ -507,9 +514,47 @@ def _build_ddl_zip(sql_dialect: SqlDialect) -> bytes:
             archive.writestr(entry, artifact.content.encode("utf-8"))
 
     content = buffer.getvalue()
-    if not content or len(content) > MAXIMUM_DDL_BUNDLE_BYTES:
-        raise ValueError("The DDL bundle exceeds the service limit.")
+    if not content or len(content) > MAXIMUM_SCHEMA_BUNDLE_BYTES:
+        raise ValueError("The OMOP schema bundle exceeds the service limit.")
     return content
+
+
+@app.get(
+    "/v1/schema-bundle/{output_format}/{sql_dialect}",
+    response_class=Response,
+    dependencies=[Depends(require_api_token)],
+)
+def schema_bundle(
+    output_format: SchemaOutputFormat,
+    sql_dialect: SqlDialect,
+) -> Response:
+    """Download complete SQL DDL or dbt contracts without using AI."""
+    try:
+        content = _build_schema_bundle_zip(
+            output_format,
+            sql_dialect,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    bundle_name = (
+        "ddl" if output_format == "sql" else "dbt_contracts"
+    )
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={
+            "Cache-Control": "private, max-age=3600",
+            "Content-Disposition": (
+                "attachment; filename="
+                f'"omop_cdm_5_4_{sql_dialect}_{bundle_name}.zip"'
+            ),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @app.get(
@@ -518,9 +563,9 @@ def _build_ddl_zip(sql_dialect: SqlDialect) -> bytes:
     dependencies=[Depends(require_api_token)],
 )
 def ddl_bundle(sql_dialect: SqlDialect) -> Response:
-    """Download deterministic OMOP DDL without calling an AI provider."""
+    """Backward-compatible deterministic OMOP DDL download."""
     try:
-        content = _build_ddl_zip(sql_dialect)
+        content = _build_schema_bundle_zip("sql", sql_dialect)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

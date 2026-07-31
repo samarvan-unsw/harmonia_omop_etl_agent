@@ -461,9 +461,11 @@ only the explicitly confirmed generation endpoint may do so.
 - `GET /health` provides unauthenticated liveness.
 - `GET /v1/generation-options` returns the safe model allowlist and hard
   project-setting bounds.
-- `GET /v1/ddl/{sql_dialect}` returns the complete table, primary-key,
-  foreign-key and index DDL bundle as a deterministic ZIP. It requires API
-  authentication but never constructs an AI provider.
+- `GET /v1/schema-bundle/{output_format}/{sql_dialect}` returns a complete
+  deterministic OMOP schema ZIP. `sql` contains table, primary-key,
+  foreign-key and index DDL; `dbt` contains one model-contract YAML per OMOP
+  table. It requires API authentication but never constructs an AI provider.
+- `GET /v1/ddl/{sql_dialect}` is the backward-compatible SQL-only route.
 - `POST /v1/validate` accepts source-schema and mapping YAML, loads the
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/preflight` performs the same validation, then uses the agent-owned
@@ -832,10 +834,11 @@ Snowflake and BigQuery load checksum-verified OHDSI assets pinned to the same
 commit as the target catalog. Athena is generated from that catalog because
 OHDSI does not supply an Athena-specific DDL there.
 
-`build_ddl_artifacts()` exposes the same complete four-file bundle without
-requiring transformation SQL. The authenticated API packages these files in a
-bounded, deterministic ZIP for standalone download. This path never creates an
-OpenAI client and therefore has no model-token cost.
+`build_schema_artifacts()` exposes a complete standalone bundle without
+requiring transformation SQL. SQL output contains the four DDL files; dbt
+output contains all 39 table contracts. The authenticated API packages these
+files in a bounded, deterministic ZIP. This path never creates an OpenAI
+client and therefore has no model-token cost.
 
 ## 14. `agent/sql_validation.py`
 

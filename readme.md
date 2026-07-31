@@ -148,13 +148,16 @@ Versioned endpoints:
 - `POST /v1/preflight`
 - `POST /v1/generate`
 - `GET /v1/generation-options`
+- `GET /v1/schema-bundle/{output_format}/{sql_dialect}`
 - `GET /v1/ddl/{sql_dialect}`
 - `GET /v1/target-schemas`
 
 The API token and OpenAI key remain server-side. API generation returns a
 bounded output bundle without overwriting locally managed output files.
-The DDL endpoint returns the four deterministic OMOP DDL files as a ZIP and
-does not require mappings, call OpenAI or consume model tokens.
+The schema-bundle endpoint returns either the four deterministic OMOP DDL
+files for `sql` output or one dbt model-contract YAML per OMOP table for `dbt`
+output. It does not require mappings, call OpenAI or consume model tokens.
+The `/v1/ddl` route remains as a backward-compatible SQL-only endpoint.
 
 ## Documentation
 

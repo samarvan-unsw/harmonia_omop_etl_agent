@@ -6,6 +6,7 @@ import yaml
 
 from agent.contracts import TargetSchemaDocument
 from agent.output_artifacts import (
+    build_dbt_schema_artifacts,
     build_ddl_artifacts,
     build_output_artifacts,
     write_local_artifacts,
@@ -100,6 +101,27 @@ class OutputArtifactsTests(unittest.TestCase):
         )
         self.assertTrue(
             all(artifact.category == "ddl" for artifact in artifacts)
+        )
+
+    def test_standalone_dbt_bundle_has_one_contract_per_target(self):
+        artifacts = build_dbt_schema_artifacts(dialect="bigquery")
+
+        self.assertEqual(len(artifacts), 39)
+        self.assertEqual(artifacts[0].file_name, "person.yml")
+        self.assertTrue(
+            all(
+                artifact.category == "dbt_contract"
+                for artifact in artifacts
+            )
+        )
+        person_contract = yaml.safe_load(artifacts[0].content)
+        self.assertEqual(
+            person_contract["models"][0]["name"],
+            "person",
+        )
+        self.assertEqual(
+            person_contract["models"][0]["columns"][0]["data_type"],
+            "INT64",
         )
 
     def test_athena_ddl_explains_unsupported_constraints_and_indexes(self):
