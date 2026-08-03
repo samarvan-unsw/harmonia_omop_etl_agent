@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -11,13 +10,13 @@ import yaml
 from pydantic import ValidationError
 
 from .contracts import TargetField, TargetSchemaDocument
+from .dialects import SUPPORTED_SQL_DIALECTS, platform_data_type
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 TARGET_SCHEMA_DIR = ROOT_DIR / "specs" / "target_schema"
 OUTPUT_DIR = ROOT_DIR / "output"
 DDL_ASSET_DIR = ROOT_DIR / "assets" / "ddl" / "5.4"
-VARCHAR_PATTERN = re.compile(r"^varchar(?:\((\d+)\))?$", re.IGNORECASE)
 DDL_FILE_NAMES = (
     "create_tables.sql",
     "primary_keys.sql",
@@ -106,55 +105,31 @@ def _load_target_schemas(
 
 def _platform_data_type(data_type: str, dialect: str) -> str:
     """Convert the canonical OMOP type to a supported physical type."""
-    normalized = data_type.strip().lower()
-    varchar_match = VARCHAR_PATTERN.fullmatch(normalized)
-    if varchar_match:
-        length = varchar_match.group(1)
-        if dialect in {"athena", "bigquery"}:
-            return "STRING"
-        return f"VARCHAR({length})" if length else "VARCHAR"
-
-    types = {
-        "snowflake": {
-            "integer": "INTEGER",
-            "float": "FLOAT",
-            "date": "DATE",
-            "datetime": "TIMESTAMP_NTZ",
-        },
-        "postgres": {
-            "integer": "INTEGER",
-            "float": "DOUBLE PRECISION",
-            "date": "DATE",
-            "datetime": "TIMESTAMP",
-        },
-        "athena": {
-            "integer": "INT",
-            "float": "DOUBLE",
-            "date": "DATE",
-            "datetime": "TIMESTAMP",
-        },
-        "bigquery": {
-            "integer": "INT64",
-            "float": "FLOAT64",
-            "date": "DATE",
-            "datetime": "DATETIME",
-        },
-    }
-    try:
-        return types[dialect][normalized]
-    except KeyError as error:
-        raise ValueError(
-            f"Unsupported OMOP data type '{data_type}' for {dialect}"
-        ) from error
+    return platform_data_type(data_type, dialect)
 
 
-def _safe_object_name(prefix: str, *parts: str) -> str:
-    """Build a deterministic identifier within PostgreSQL's 63-byte limit."""
+def _safe_object_name(
+    prefix: str,
+    *parts: str,
+    max_length: int = 63,
+) -> str:
+    """Build a deterministic identifier within a platform length limit."""
     value = "_".join((prefix, *parts)).lower()
-    if len(value) <= 63:
+    if len(value) <= max_length:
         return value
     digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:10]
-    return f"{value[:52]}_{digest}"
+    return f"{value[:max_length - 11]}_{digest}"
+
+
+def _identifier_max_length(dialect: str) -> int:
+    """Return a conservative identifier limit for generated objects."""
+    return {
+        "oracle": 30,
+        "postgres": 63,
+        "redshift": 127,
+        "sql_server": 128,
+        "synapse": 128,
+    }.get(dialect, 63)
 
 
 def _header(title: str, dialect: str, cdm_version: str) -> list[str]:
@@ -185,26 +160,42 @@ def _create_tables_sql(
                 "",
             ]
         )
+    if dialect == "spark":
+        lines.extend(
+            [
+                "-- Spark tables use Parquet for portability across Spark "
+                "and Databricks.",
+                "",
+            ]
+        )
     for schema in schemas:
         create_kind = (
             "CREATE EXTERNAL TABLE"
             if dialect == "athena"
             else "CREATE TABLE"
         )
-        lines.append(
-            f"{create_kind} IF NOT EXISTS {schema.target_table} ("
+        if_not_exists = (
+            " IF NOT EXISTS"
+            if dialect in {"athena", "redshift", "spark"}
+            else ""
         )
+        lines.append(f"{create_kind}{if_not_exists} {schema.target_table} (")
         columns = []
         for field in schema.fields:
             data_type = _platform_data_type(field.data_type, dialect)
             required = (
                 " NOT NULL"
-                if field.required and dialect != "athena"
+                if field.required and dialect not in {"athena", "spark"}
                 else ""
             )
             columns.append(f"    {field.name} {data_type}{required}")
         lines.append(",\n".join(columns))
-        terminator = ") STORED AS PARQUET;" if dialect == "athena" else ");"
+        if dialect == "athena":
+            terminator = ") STORED AS PARQUET;"
+        elif dialect == "spark":
+            terminator = ") USING PARQUET;"
+        else:
+            terminator = ");"
         lines.extend([terminator, ""])
     return "\n".join(lines).rstrip() + "\n"
 
@@ -223,6 +214,21 @@ def _primary_keys_sql(
             "-- Amazon Athena does not support primary-key constraints."
         )
         return "\n".join(lines).rstrip() + "\n"
+    if dialect in {"spark", "synapse"}:
+        lines.append(
+            f"-- {dialect} primary-key constraints are not emitted because "
+            "portable enforcement is unavailable."
+        )
+        return "\n".join(lines).rstrip() + "\n"
+
+    if dialect == "redshift":
+        lines.extend(
+            [
+                "-- Redshift records primary keys as optimizer metadata; it "
+                "does not enforce them.",
+                "",
+            ]
+        )
 
     for schema in schemas:
         fields = [
@@ -230,7 +236,11 @@ def _primary_keys_sql(
         ]
         if not fields:
             continue
-        constraint = _safe_object_name("pk", schema.target_table)
+        constraint = _safe_object_name(
+            "pk",
+            schema.target_table,
+            max_length=_identifier_max_length(dialect),
+        )
         suffix = " NOT ENFORCED" if dialect == "bigquery" else ""
         lines.extend(
             [
@@ -257,6 +267,21 @@ def _foreign_keys_sql(
             "-- Amazon Athena does not support foreign-key constraints."
         )
         return "\n".join(lines).rstrip() + "\n"
+    if dialect in {"spark", "synapse"}:
+        lines.append(
+            f"-- {dialect} foreign-key constraints are not emitted because "
+            "portable enforcement is unavailable."
+        )
+        return "\n".join(lines).rstrip() + "\n"
+
+    if dialect == "redshift":
+        lines.extend(
+            [
+                "-- Redshift records foreign keys as optimizer metadata; it "
+                "does not enforce them.",
+                "",
+            ]
+        )
 
     for schema in schemas:
         for field in schema.fields:
@@ -267,6 +292,7 @@ def _foreign_keys_sql(
                 "fk",
                 schema.target_table,
                 field.name,
+                max_length=_identifier_max_length(dialect),
             )
             suffix = " NOT ENFORCED" if dialect == "bigquery" else ""
             lines.extend(
@@ -291,10 +317,15 @@ def _indexes_sql(
         dialect,
         schemas[0].cdm_version,
     )
-    if dialect != "postgres":
+    if dialect == "athena":
         lines.append(
-            f"-- {dialect} does not support conventional secondary indexes; "
-            "no index statements are emitted."
+            "-- Amazon Athena does not support conventional secondary "
+            "indexes; no index statements are emitted."
+        )
+        return "\n".join(lines).rstrip() + "\n"
+    if dialect not in {"postgres", "sql_server", "oracle"}:
+        lines.append(
+            f"-- Portable secondary-index DDL is not emitted for {dialect}."
         )
         return "\n".join(lines).rstrip() + "\n"
 
@@ -306,10 +337,12 @@ def _indexes_sql(
                 "idx",
                 schema.target_table,
                 field.name,
+                max_length=_identifier_max_length(dialect),
             )
+            if_not_exists = " IF NOT EXISTS" if dialect == "postgres" else ""
             lines.extend(
                 [
-                    f"CREATE INDEX IF NOT EXISTS {index_name}",
+                    f"CREATE INDEX{if_not_exists} {index_name}",
                     f"    ON {schema.target_table} ({field.name});",
                     "",
                 ]
@@ -324,9 +357,9 @@ def _dbt_column(field: TargetField, dialect: str) -> dict:
         "description": field.description,
     }
     constraints: list[dict[str, str]] = []
-    if field.required and dialect != "athena":
+    if field.required and dialect not in {"athena", "spark"}:
         constraints.append({"type": "not_null"})
-    if field.primary_key and dialect != "athena":
+    if field.primary_key and dialect not in {"athena", "spark", "synapse"}:
         constraints.append({"type": "primary_key"})
     if constraints:
         column["constraints"] = constraints
@@ -442,7 +475,7 @@ def build_ddl_artifacts(
     target_schema_dir: Path = TARGET_SCHEMA_DIR,
 ) -> list[OutputArtifact]:
     """Build the complete OMOP DDL bundle without an AI request."""
-    if dialect not in {"postgres", "snowflake", "athena", "bigquery"}:
+    if dialect not in SUPPORTED_SQL_DIALECTS:
         raise ValueError(f"Unsupported SQL dialect: {dialect}")
 
     if dialect in {"postgres", "snowflake", "bigquery"}:
@@ -473,7 +506,7 @@ def build_dbt_schema_artifacts(
     target_schema_dir: Path = TARGET_SCHEMA_DIR,
 ) -> list[OutputArtifact]:
     """Build deterministic dbt contracts for all or selected OMOP tables."""
-    if dialect not in {"postgres", "snowflake", "athena", "bigquery"}:
+    if dialect not in SUPPORTED_SQL_DIALECTS:
         raise ValueError(f"Unsupported SQL dialect: {dialect}")
 
     schemas = _load_target_schemas(target_schema_dir)

@@ -134,14 +134,17 @@ The selected format controls the deterministic companion files:
   `ddl/primary_keys.sql`, `ddl/foreign_keys.sql` and `ddl/indexes.sql`.
 
 Only transformation SQL uses the AI provider. PostgreSQL, Snowflake and
-BigQuery DDL is copied from pinned OHDSI assets. Athena DDL and dbt YAML are
-generated deterministically from the pinned target schemas.
+BigQuery DDL is copied from pinned OHDSI assets. DDL for the other supported
+platforms and all dbt YAML are generated deterministically from the pinned
+target schemas.
 
 The official assets retain the `@cdmDatabaseSchema` placeholder; render it
 with the deployment schema before execution. Athena also requires
 environment-specific S3 `LOCATION` clauses.
 
-Supported dialects are `snowflake`, `postgres`, `athena` and `bigquery`.
+Supported dialects are `snowflake`, `postgres`, `athena`, `bigquery`,
+`sql_server`, `spark`, `oracle`, `redshift` and `synapse`. The `spark` option
+targets portable Databricks / Spark SQL.
 
 ## 5. Add or maintain source schemas
 

@@ -56,4 +56,6 @@ source:
 output:
   # Generate plain SQL unless the user explicitly selects another format.
   format: dbt           # sql | dbt
-  dialect: snowflake    # snowflake | postgres | athena | bigquery
+  # snowflake | postgres | athena | bigquery | sql_server | spark |
+  # oracle | redshift | synapse
+  dialect: snowflake

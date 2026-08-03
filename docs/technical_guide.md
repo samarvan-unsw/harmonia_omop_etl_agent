@@ -283,7 +283,7 @@ Its validator requires `source_name` when `dbt_source` is selected.
 Defines:
 
 - Output format: `sql` or `dbt`.
-- SQL dialect: `snowflake`, `postgres`, `athena` or `bigquery`.
+- SQL dialect: one of the identifiers defined in `agent/dialects.py`.
 
 #### `AgentConfig`
 
@@ -1078,10 +1078,11 @@ python -m unittest discover -s tests -v
 
 ### Add another SQL dialect
 
-1. Extend `OutputConfig.dialect`.
-2. Confirm `sqlglot` parsing behaviour.
-3. Add datatype-equivalence rules if needed.
-4. Add syntax and typed-null tests.
+1. Extend the shared registry, parser name, prompt name and physical datatype
+   map in `agent/dialects.py`.
+2. Add deterministic DDL behaviour in `agent/output_artifacts.py`.
+3. Confirm `sqlglot` parsing behaviour.
+4. Add artifact, API, syntax and typed-null tests.
 
 ### Add mappings for another OMOP table
 

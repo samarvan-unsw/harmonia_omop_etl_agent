@@ -173,6 +173,56 @@ class OutputArtifactsTests(unittest.TestCase):
             by_name["indexes.sql"],
         )
 
+    def test_new_dialects_build_deterministic_schema_bundles(self):
+        expected_types = {
+            "sql_server": "person_id INT NOT NULL",
+            "spark": "person_id INT",
+            "oracle": "person_id INTEGER NOT NULL",
+            "redshift": "person_id INTEGER NOT NULL",
+            "synapse": "person_id INT NOT NULL",
+        }
+
+        for dialect, expected_type in expected_types.items():
+            with self.subTest(dialect=dialect):
+                artifacts = build_ddl_artifacts(dialect=dialect)
+                by_name = {
+                    artifact.file_name: artifact.content
+                    for artifact in artifacts
+                }
+
+                self.assertEqual(
+                    set(by_name),
+                    {
+                        "create_tables.sql",
+                        "primary_keys.sql",
+                        "foreign_keys.sql",
+                        "indexes.sql",
+                    },
+                )
+                self.assertIn(expected_type, by_name["create_tables.sql"])
+
+    def test_new_dialects_build_typed_dbt_contracts(self):
+        expected_types = {
+            "sql_server": "INT",
+            "spark": "INT",
+            "oracle": "INTEGER",
+            "redshift": "INTEGER",
+            "synapse": "INT",
+        }
+
+        for dialect, expected_type in expected_types.items():
+            with self.subTest(dialect=dialect):
+                artifact = build_dbt_schema_artifacts(
+                    dialect=dialect,
+                    target_tables={"person"},
+                )[0]
+                contract = yaml.safe_load(artifact.content)
+
+                self.assertEqual(
+                    contract["models"][0]["columns"][0]["data_type"],
+                    expected_type,
+                )
+
     def test_local_writer_separates_ddl_from_dbt_contracts(self):
         dbt_artifacts = build_output_artifacts(
             generated_sql="select 1 as person_id",

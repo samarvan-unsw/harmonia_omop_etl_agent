@@ -1,5 +1,7 @@
 """Prompt construction for OMOP SQL generation."""
 
+from .dialects import sql_dialect_prompt_name
+
 
 SPEC_DATA_START = "<UNTRUSTED_SPECIFICATION_DATA>"
 SPEC_DATA_END = "</UNTRUSTED_SPECIFICATION_DATA>"
@@ -33,12 +35,14 @@ def build_system_prompt(omop_table: str, config: dict) -> str:
         else "Generate a dbt-compatible SQL model."
     )
 
+    dialect_name = sql_dialect_prompt_name(output["dialect"])
+
     return f"""You are a data engineer converting source healthcare data into the OMOP CDM.
 
 Generate exactly one file named `{output_filename}`.
 
 Output requirements:
-- SQL dialect: {output["dialect"]}
+- SQL dialect: {dialect_name}
 - Output format: {output_format}
 - {format_instruction}
 - {_source_reference_instruction(config["source"])}

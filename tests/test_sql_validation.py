@@ -266,6 +266,35 @@ class TypedNullValidationTest(unittest.TestCase):
 
         self.assertTrue(result.valid)
 
+    def test_accepts_platform_datetime_types_for_new_dialects(self):
+        target = TargetField(
+            name="birth_datetime",
+            data_type="datetime",
+            required=False,
+        )
+        platform_types = {
+            "sql_server": "DATETIME2",
+            "spark": "TIMESTAMP",
+            "oracle": "TIMESTAMP",
+            "redshift": "TIMESTAMP",
+            "synapse": "DATETIME2",
+        }
+
+        for dialect, data_type in platform_types.items():
+            with self.subTest(dialect=dialect):
+                result = validate_sql(
+                    sql=(
+                        f"SELECT CAST(NULL AS {data_type}) "
+                        "AS birth_datetime"
+                    ),
+                    dialect=dialect,
+                    expected_fields=["birth_datetime"],
+                    field_mappings=[],
+                    target_fields=[target],
+                )
+
+                self.assertTrue(result.valid, result.errors)
+
 
 class MappingTableSqlValidationTest(unittest.TestCase):
     mapping = FieldMapping(

@@ -11,6 +11,7 @@ from .contracts import (
     SourceJoin,
     TargetField,
 )
+from .dialects import platform_data_type, sqlglot_dialect
 
 
 @dataclass(frozen=True)
@@ -73,15 +74,19 @@ def _normalized_data_type(
     dialect: str,
 ) -> str:
     """Normalize generic and dialect-specific names for comparison."""
+    parser_dialect = sqlglot_dialect(dialect)
     parsed = (
-        exp.DataType.build(data_type, dialect=dialect)
+        exp.DataType.build(
+            platform_data_type(data_type, dialect),
+            dialect=parser_dialect,
+        )
         if isinstance(data_type, str)
         else data_type
     )
     normalized = re.sub(
         r"\s+",
         "",
-        parsed.sql(dialect=dialect),
+        parsed.sql(dialect=parser_dialect),
     ).casefold()
     if dialect == "snowflake" and normalized == "datetime":
         return "timestampntz"
@@ -143,7 +148,7 @@ def _typed_null_errors(
     ) != _normalized_data_type(expected_type, dialect):
         return [
             f"{target_field} NULL type must be {expected_type}, "
-            f"found {actual_type.sql(dialect=dialect)}"
+            f"found {actual_type.sql(dialect=sqlglot_dialect(dialect))}"
         ]
     return []
 
@@ -738,7 +743,7 @@ def validate_sql(
         errors.append("unsupported dbt/Jinja expression remains after preprocessing")
 
     try:
-        statements = parse(candidate, read=dialect)
+        statements = parse(candidate, read=sqlglot_dialect(dialect))
     except (ParseError, ValueError) as exc:
         return SqlValidationResult(False, (f"invalid {dialect} SQL: {exc}",))
 

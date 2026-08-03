@@ -32,6 +32,7 @@ from pydantic import (
 
 from .contracts import AgentConfig, TargetSchemaDocument
 from .costing import estimated_usage_cost_usd
+from .dialects import SqlDialect
 from .loop import run_agent_with_specs
 from .output_artifacts import build_schema_artifacts
 from .preflight import (
@@ -66,7 +67,6 @@ OmopTable = Annotated[
         max_length=63,
     ),
 ]
-SqlDialect = Literal["snowflake", "postgres", "athena", "bigquery"]
 SchemaOutputFormat = Literal["sql", "dbt"]
 YamlFileName = Annotated[
     str,

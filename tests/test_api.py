@@ -274,7 +274,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             {"AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
-                "/v1/ddl/oracle",
+                "/v1/ddl/sqlite",
                 headers=self.headers,
             )
 

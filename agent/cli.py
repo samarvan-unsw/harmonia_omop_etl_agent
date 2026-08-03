@@ -14,6 +14,7 @@ from openai import (
 from pydantic import ValidationError
 
 from .contracts import AgentConfig
+from .dialects import SUPPORTED_SQL_DIALECTS
 from .costing import estimated_usage_cost_usd
 from .loop import run_agent
 from .preflight import (
@@ -97,7 +98,7 @@ def main():
     )
     parser.add_argument(
         "--dialect",
-        choices=["snowflake", "postgres", "athena", "bigquery"],
+        choices=SUPPORTED_SQL_DIALECTS,
         help="Override the configured SQL dialect.",
     )
     parser.add_argument(

@@ -10,6 +10,8 @@ from pydantic import (
     model_validator,
 )
 
+from .dialects import SqlDialect
+
 
 # =============================================================================
 # SHARED CONTRACT BASE
@@ -50,7 +52,7 @@ class OutputConfig(StrictModel):
     """Generated artifact format and SQL dialect."""
 
     format: Literal["sql", "dbt"]
-    dialect: Literal["snowflake", "postgres", "athena", "bigquery"]
+    dialect: SqlDialect
 
 
 class ProjectLimitsConfig(StrictModel):
