@@ -1,3 +1,5 @@
+"""Validate generated SQL against its dialect, target schema, and mapping contract."""
+
 import re
 from collections import defaultdict
 from dataclasses import dataclass

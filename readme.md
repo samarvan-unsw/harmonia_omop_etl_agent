@@ -76,6 +76,15 @@ Validate one OMOP table without an API call:
 python -m agent.cli person --validate-only
 ```
 
+Create ETL documentation locally without an API call:
+
+```bash
+python -m agent.cli person --etl-specification docx
+```
+
+Choose `md`, `docx` or `pdf`. The file is written beneath
+`output/etl_specifications/`.
+
 Inspect generation readiness, the worst-case token ceiling and the estimated
 maximum API cost without an API call:
 
@@ -145,6 +154,7 @@ curl http://127.0.0.1:8000/health
 Versioned endpoints:
 
 - `POST /v1/validate`
+- `POST /v1/etl-specification/{output_format}`
 - `POST /v1/preflight`
 - `POST /v1/generate`
 - `GET /v1/generation-options`
@@ -160,6 +170,10 @@ output. Repeated `tables` query parameters can limit dbt output to selected
 targets; omitting them returns all 39. It does not call OpenAI or consume model
 tokens.
 The `/v1/ddl` route remains as a backward-compatible SQL-only endpoint.
+The ETL specification endpoint accepts `md`, `docx` or `pdf`, validates the
+submitted mapping and source schemas, and creates a mapping diagram,
+field-level ETL table and change log. It is deterministic and does not call
+OpenAI.
 
 ## Documentation
 

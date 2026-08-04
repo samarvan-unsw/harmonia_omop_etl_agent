@@ -1,3 +1,5 @@
+"""Provide restricted file tools for staging and safely promoting generated SQL."""
+
 import os
 import re
 from pathlib import Path

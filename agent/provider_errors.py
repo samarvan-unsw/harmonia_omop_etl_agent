@@ -1,3 +1,5 @@
+"""Translate OpenAI SDK exceptions into safe, actionable user-facing messages."""
+
 from openai import (
     APIConnectionError,
     APIStatusError,

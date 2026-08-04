@@ -1,3 +1,5 @@
+"""Assess generation readiness, request size, token limits, and estimated cost."""
+
 from dataclasses import dataclass
 
 from .context import build_context_from_specs

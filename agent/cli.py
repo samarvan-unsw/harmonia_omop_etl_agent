@@ -1,3 +1,5 @@
+"""Provide the command-line interface for validating and generating one target table."""
+
 import argparse
 import json
 import os
@@ -5,6 +7,7 @@ import sys
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import yaml
 from dotenv import load_dotenv
@@ -96,6 +99,14 @@ def main():
         action="store_true",
         help="Preview validated generation settings without calling the API.",
     )
+    execution_mode.add_argument(
+        "--etl-specification",
+        choices=["md", "docx", "pdf"],
+        help=(
+            "Create deterministic ETL documentation in the selected format "
+            "without loading config.yaml or calling an API."
+        ),
+    )
     parser.add_argument(
         "--dialect",
         choices=SUPPORTED_SQL_DIALECTS,
@@ -124,6 +135,54 @@ def main():
         ),
     )
     args = parser.parse_args()
+
+    specs_dir = ROOT / "specs"
+    if args.etl_specification:
+        try:
+            specs = validate_specs(args.omop_table, specs_dir)
+        except SpecValidationError as exc:
+            parser.error(str(exc))
+        pending_reviews = pending_review_fields(specs)
+        if pending_reviews:
+            parser.error(
+                "ETL specification blocked by pending mapping reviews: "
+                + ", ".join(pending_reviews)
+            )
+
+        # Keep document libraries off ordinary validation and generation
+        # startup paths.
+        from .etl_specification import build_etl_specification
+
+        try:
+            artifact = build_etl_specification(
+                specs,
+                args.etl_specification,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        output_dir = ROOT / "output" / "etl_specifications"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / artifact.file_name
+        temporary_path: Path | None = None
+        try:
+            with NamedTemporaryFile(
+                dir=output_dir,
+                prefix=f".{artifact.file_name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary_file:
+                temporary_file.write(artifact.content)
+                temporary_path = Path(temporary_file.name)
+            os.replace(temporary_path, output_path)
+        finally:
+            if temporary_path is not None and temporary_path.exists():
+                temporary_path.unlink()
+
+        print(
+            f"ETL specification created: {output_path}. "
+            "No API call was made."
+        )
+        return
 
     load_dotenv(ROOT / ".env")
     try:
@@ -166,8 +225,6 @@ def main():
             f"--max-run-output-tokens={args.max_run_output_tokens}. "
             "Reduce --max-iterations or max_output_tokens."
         )
-
-    specs_dir = ROOT / "specs"
 
     try:
         specs = validate_specs(args.omop_table, specs_dir)

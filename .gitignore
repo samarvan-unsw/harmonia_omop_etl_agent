@@ -11,3 +11,4 @@ __pycache__/
 logs/*.json
 output/*.sql
 output/.*.candidate
+output/etl_specifications/

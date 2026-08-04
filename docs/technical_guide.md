@@ -147,6 +147,7 @@ The practical sequence is:
 | `agent.contracts` | Pydantic contracts for configuration and YAML | Validation and CLI |
 | `agent.validation` | File and in-memory cross-specification validation | CLI, API, context and loop |
 | `agent.api` | Authenticated HTTP validation and preflight interface | UI or another server |
+| `agent.etl_specification` | Deterministic Markdown, Word and PDF ETL documentation | API and CLI |
 | `agent.preflight` | Shared readiness, prompt-size and token-ceiling calculation | CLI and API |
 | `agent.costing` | Token-length and model-price cost estimates | Preflight, CLI and API |
 | `agent.context` | Prompt-ready representation of validated specs | CLI, API and loop |
@@ -470,6 +471,10 @@ only the explicitly confirmed generation endpoint may do so.
 - `GET /v1/ddl/{sql_dialect}` is the backward-compatible SQL-only route.
 - `POST /v1/validate` accepts source-schema and mapping YAML, loads the
   agent-owned target schema and returns validation and review readiness.
+- `POST /v1/etl-specification/{output_format}` accepts the same specification
+  request and returns a validated `md`, `docx` or `pdf` document. It includes a
+  mapping diagram, field-level mapping table, source relationships and change
+  log without constructing an AI provider.
 - `POST /v1/preflight` performs the same validation, then uses the agent-owned
   config and prompts to report prompt size, SQL settings, attempt limits and
   the worst-case output-token ceiling and estimated maximum API cost.
@@ -504,7 +509,16 @@ project cannot weaken the deployed service safeguards. Context size, initial
 request usage and the total output-token ceiling remain calculated values.
 The dated pricing registry must exactly cover every allowlisted model.
 
-## 6B. `agent/preflight.py`
+## 6B. `agent/etl_specification.py`
+
+Builds ETL documentation from `ValidatedSpecs` in target-schema field order.
+The renderer-independent document model is shared by Markdown, landscape Word
+and landscape PDF renderers. Optional target fields absent from the mapping are
+documented as explicit NULL outputs. Mapping `notes`, field `comment`, joins,
+`union_all`, lookup names and `change_log` entries remain traceable to the
+mapping YAML. This module is deterministic and never imports an AI provider.
+
+## 6C. `agent/preflight.py`
 
 ### Purpose
 
@@ -520,7 +534,7 @@ provider or making an OpenAI request.
 - `configured_output_token_ceiling()` applies the configured per-request
   output limit, generation attempts and API retry count.
 
-## 6C. `agent/costing.py`
+## 6D. `agent/costing.py`
 
 Uses a deterministic three-UTF-8-bytes-per-token estimate before generation,
 then applies the selected model's dated standard-tier pricing. Maximum cost
@@ -1023,8 +1037,9 @@ document and foreign key, then atomically replaces the catalog.
 ### `output/`
 
 Contains promoted transformation SQL, dbt contract YAML or the static
-`ddl/` bundle, plus short-lived hidden candidates. Generated artifacts are
-gitignored; a non-authoritative example is stored under `examples/generated/`.
+`ddl/` bundle, deterministic ETL specifications, plus short-lived hidden
+candidates. Generated artifacts are gitignored; a non-authoritative example is
+stored under `examples/generated/`.
 
 ### `logs/`
 
@@ -1054,6 +1069,7 @@ change local CLI execution.
 | `tests/test_tools.py` | Output path restrictions and candidate lifecycle |
 | `tests/test_validation.py` | Cross-spec rules, reviews and generated mapping names |
 | `tests/test_api.py` | Authentication, validation, preflight, generation gates and redaction |
+| `tests/test_etl_specification.py` | Document model and Markdown, Word and PDF renderers |
 | `tests/test_preflight.py` | Shared readiness, prompt size and token-ceiling calculation |
 | `tests/test_costing.py` | Token estimates, maximum cost and measured usage cost |
 | `tests/test_target_schemas.py` | Full OMOP catalog counts, versions, filenames and foreign keys |

@@ -1,3 +1,5 @@
+"""Orchestrate the bounded generate, validate, revise, and promote workflow."""
+
 from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4

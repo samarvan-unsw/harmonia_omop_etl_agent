@@ -1,3 +1,5 @@
+"""Implement the agent provider using OpenAI's Responses API."""
+
 import json
 from typing import Any
 

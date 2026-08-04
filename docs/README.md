@@ -1,5 +1,7 @@
 # Documentation
 
+- [Agent build talk track](agent_build_talk_track.md): domain-neutral guide to
+  designing, implementing, testing and explaining controlled AI agents.
 - [User guide](user_guide.md): prepare specifications, validate and generate
   SQL.
 - [Technical guide](technical_guide.md): architecture, local setup, modules,

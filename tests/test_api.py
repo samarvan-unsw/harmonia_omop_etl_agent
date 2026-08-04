@@ -358,6 +358,56 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 503)
 
+    async def test_downloads_etl_specifications_without_generation(self):
+        self.approve_mapping_reviews()
+        expected = {
+            "md": ("text/markdown", b"# pe"),
+            "docx": (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                b"PK\x03\x04",
+            ),
+            "pdf": ("application/pdf", b"%PDF"),
+        }
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            for output_format, (media_type, signature) in expected.items():
+                with self.subTest(output_format=output_format):
+                    response = await self.client.post(
+                        f"/v1/etl-specification/{output_format}",
+                        json=self.payload,
+                        headers=self.headers,
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(
+                        response.headers["content-type"].split(";")[0],
+                        media_type,
+                    )
+                    self.assertTrue(response.content.startswith(signature))
+                    self.assertIn(
+                        f"person_etl_specification.{output_format}",
+                        response.headers["content-disposition"],
+                    )
+        run_agent.assert_not_called()
+
+    async def test_etl_specification_requires_approved_reviews(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/etl-specification/md",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("race_concept_id", response.json()["detail"])
+
     async def test_validates_without_calling_openai(self):
         with patch.dict(
             os.environ,

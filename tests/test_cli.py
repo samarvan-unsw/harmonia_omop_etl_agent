@@ -1,6 +1,9 @@
 import io
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from openai import OpenAIError
@@ -47,6 +50,53 @@ class DryRunTest(unittest.TestCase):
         self.assertIn("Context size:", text)
         self.assertIn("Initial request size:", text)
         self.assertIn("Generation readiness:", text)
+
+
+class EtlSpecificationCliTest(unittest.TestCase):
+    def test_creates_document_without_loading_config_or_calling_api(self):
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            with (
+                patch(
+                    "sys.argv",
+                    [
+                        "agent.cli",
+                        "person",
+                        "--etl-specification",
+                        "md",
+                    ],
+                ),
+                patch("agent.cli.ROOT", root),
+                patch("agent.cli.validate_specs", return_value=object()),
+                patch(
+                    "agent.cli.pending_review_fields",
+                    return_value=(),
+                ),
+                patch(
+                    "agent.etl_specification.build_etl_specification",
+                    return_value=SimpleNamespace(
+                        content=b"# person ETL specification\n",
+                        file_name="person_etl_specification.md",
+                    ),
+                ),
+                patch("agent.cli.run_agent") as run_agent,
+                redirect_stdout(output),
+            ):
+                main()
+
+            document = (
+                root
+                / "output"
+                / "etl_specifications"
+                / "person_etl_specification.md"
+            )
+            self.assertEqual(
+                document.read_bytes(),
+                b"# person ETL specification\n",
+            )
+        run_agent.assert_not_called()
+        self.assertIn("No API call was made", output.getvalue())
 
 
 class CostGuardTest(unittest.TestCase):

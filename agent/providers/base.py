@@ -1,3 +1,5 @@
+"""Define the provider interface and shared response, tool-call, and usage types."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 

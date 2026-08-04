@@ -1,3 +1,5 @@
+"""Expose agent validation, preflight, generation, and schema endpoints via FastAPI."""
+
 import hmac
 import os
 from io import BytesIO
@@ -56,6 +58,7 @@ MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
 MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
 MAXIMUM_SCHEMA_BUNDLE_BYTES = 4 * 1024 * 1024
+MAXIMUM_ETL_SPECIFICATION_BYTES = 4 * 1024 * 1024
 MINIMUM_OUTPUT_TOKENS_PER_REQUEST = 100
 MINIMUM_INITIAL_PROMPT_CHARACTERS = 1_000
 GENERATION_SEMAPHORE = BoundedSemaphore(value=1)
@@ -68,6 +71,7 @@ OmopTable = Annotated[
     ),
 ]
 SchemaOutputFormat = Literal["sql", "dbt"]
+EtlSpecificationFormat = Literal["md", "docx", "pdf"]
 YamlFileName = Annotated[
     str,
     StringConstraints(
@@ -868,6 +872,65 @@ def validate(request: ValidationRequest) -> ValidationResponse:
         source_models=sorted(specs.source_models),
         target_field_count=len(specs.target_schema.fields),
         pending_reviews=pending_reviews,
+    )
+
+
+@app.post(
+    "/v1/etl-specification/{output_format}",
+    response_class=Response,
+    dependencies=[Depends(require_api_token)],
+)
+def etl_specification(
+    output_format: EtlSpecificationFormat,
+    request: ValidationRequest,
+) -> Response:
+    """Download validated ETL documentation without calling AI."""
+    try:
+        specs = _validate_request_specifications(request)
+    except SpecValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    pending_reviews = pending_review_fields(specs)
+    if pending_reviews:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Approve pending mapping reviews before creating an ETL "
+                "specification: " + ", ".join(pending_reviews)
+            ),
+        )
+
+    # Keep the comparatively heavy document libraries off validation,
+    # preflight and health-check startup paths.
+    from .etl_specification import build_etl_specification
+
+    try:
+        artifact = build_etl_specification(specs, output_format)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    if len(artifact.content) > MAXIMUM_ETL_SPECIFICATION_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The ETL specification exceeds the service limit.",
+        )
+
+    return Response(
+        content=artifact.content,
+        media_type=artifact.media_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": (
+                f'attachment; filename="{artifact.file_name}"'
+            ),
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

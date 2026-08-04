@@ -1,3 +1,5 @@
+"""Construct the model provider selected by the validated agent configuration."""
+
 import os
 
 from .base import AgentProvider

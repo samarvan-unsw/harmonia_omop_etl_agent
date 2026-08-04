@@ -239,6 +239,7 @@ Example:
 ```yaml
 version: 1
 target_table: person
+notes: Create one OMOP person per reconciled source patient.
 
 source_models:
   - cai_01_patient
@@ -252,6 +253,7 @@ fields:
       - model: cai_01_patient
         field: patient_id
     transformation: Cast patient_id to integer.
+    comment: Preserve the source identifier for lineage.
 
   - target_field: year_of_birth
     action: derive
@@ -264,6 +266,11 @@ fields:
     action: "null"
     source_fields: []
     transformation: Set to null because no valid source is available.
+
+change_log:
+  - date: 2026-08-04
+    description: Added the initial person mapping.
+    author: Data team
 ```
 
 Mapping actions:
@@ -276,6 +283,10 @@ Mapping actions:
 
 Always quote `"null"` because an unquoted YAML `null` means an empty YAML
 value.
+
+`notes`, field-level `comment` values and `change_log` entries are optional,
+but they provide the narrative and audit content used by deterministic ETL
+specification documents.
 
 Rules for missing fields:
 
@@ -400,6 +411,18 @@ python -m agent.cli person --validate-only
 This command does not call the API.
 
 Fix every reported contract, missing-field or review error before continuing.
+
+### Create an ETL specification locally
+
+After validation and review approval, generate deterministic documentation:
+
+```bash
+python -m agent.cli person --etl-specification docx
+```
+
+Choose `md`, `docx` or `pdf`. The document is written beneath
+`output/etl_specifications/` and includes a mapping diagram, field mapping
+table, source relationships and change log. It does not call OpenAI.
 
 ## 9. Run a dry-run
 

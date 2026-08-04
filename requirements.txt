@@ -1,7 +1,32 @@
+# Exposes the agent's validation and generation workflows as an HTTP API.
 fastapi==0.139.2
+
+# Provides the pinned XML engine used by Microsoft Word document generation.
+lxml==6.1.1
+
+# Calls OpenAI models through the Responses API.
 openai==2.47.0
+
+# Renders deterministic mapping diagrams embedded in ETL specifications.
+Pillow==12.3.0
+
+# Defines and validates source-schema, mapping, configuration, and API contracts.
 pydantic==2.13.4
+
+# Creates downloadable Microsoft Word ETL specification documents.
+python-docx==1.2.0
+
+# Loads local secrets and configuration values from .env files.
 python-dotenv==1.2.2
+
+# Reads and writes the YAML specification files used by the agent.
 PyYAML==6.0.3
+
+# Creates deterministic PDF ETL specification documents.
+reportlab==4.5.1
+
+# Parses and validates generated SQL across the supported SQL dialects.
 sqlglot==30.13.0
+
+# Runs the FastAPI application as an ASGI web server.
 uvicorn==0.51.0

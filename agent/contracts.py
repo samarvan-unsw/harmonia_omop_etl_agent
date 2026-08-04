@@ -1,3 +1,5 @@
+"""Define strict Pydantic contracts for configuration, schemas, and mappings."""
+
 from datetime import date
 from typing import Annotated, Literal
 
@@ -238,6 +240,7 @@ class FieldMapping(StrictModel):
     action: Literal["map", "derive", "null"]
     source_fields: list[SourceFieldReference] = Field(default_factory=list)
     transformation: str = ""
+    comment: str = Field(default="", max_length=10_000)
     mapping_table_name: SqlIdentifier | None = None
     review_required: bool = False
     review_status: Literal["pending", "approved"] | None = None
@@ -253,6 +256,12 @@ class FieldMapping(StrictModel):
     @classmethod
     def normalize_empty_transformation(cls, value):
         """Treat an empty YAML value as omitted transformation text."""
+        return "" if value is None else value
+
+    @field_validator("comment", mode="before")
+    @classmethod
+    def normalize_empty_comment(cls, value):
+        """Treat an empty YAML value as omitted documentation text."""
         return "" if value is None else value
 
     @field_validator("mapping_table_name", mode="before")
@@ -305,15 +314,28 @@ class FieldMapping(StrictModel):
         return self
 
 
+class MappingChange(StrictModel):
+    """One user-maintained semantic change to an ETL mapping."""
+
+    date: date
+    description: str = Field(min_length=1, max_length=5_000)
+    author: str = Field(default="", max_length=255)
+
+
 class MappingDocument(StrictModel):
     """Root structure of one source-to-OMOP mapping file."""
 
     version: Literal[1]
     target_table: SqlIdentifier
+    notes: str = Field(default="", max_length=10_000)
     source_models: list[SqlIdentifier] = Field(min_length=1)
     joins: list[SourceJoin] = Field(default_factory=list)
     union_all: list[SqlIdentifier] = Field(default_factory=list)
     fields: list[FieldMapping] = Field(min_length=1)
+    change_log: list[MappingChange] = Field(
+        default_factory=list,
+        max_length=100,
+    )
 
     @model_validator(mode="after")
     def validate_references(self) -> "MappingDocument":

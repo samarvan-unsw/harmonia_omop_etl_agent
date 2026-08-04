@@ -1,3 +1,5 @@
+"""Render validated specifications as compact, structured model context."""
+
 from pathlib import Path
 
 from .contracts import FieldMapping, SourceModel, TargetField

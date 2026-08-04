@@ -1,3 +1,5 @@
+"""Load and cross-validate source, mapping, and target specification documents."""
+
 from dataclasses import dataclass
 from pathlib import Path
 import re
