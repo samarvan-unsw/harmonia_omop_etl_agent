@@ -473,8 +473,13 @@ only the explicitly confirmed generation endpoint may do so.
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/etl-specification/{output_format}` accepts the same specification
   request and returns a validated `md`, `docx` or `pdf` document. It includes a
-  mapping diagram, field-level mapping table, source relationships and change
-  log without constructing an AI provider.
+  mapping-grid style diagram, field-level mapping table, source relationships
+  and change log without constructing an AI provider. Long Word and PDF tables
+  repeat their header, keep rows intact and include page numbering.
+- `POST /v1/etl-specification-bundle/{output_format}` accepts two to 50
+  mappings with shared source schemas and returns one deterministic ZIP with a
+  separate document per OMOP table. This preserves table-level pagination and
+  review ownership while supporting multi-table UI downloads.
 - `POST /v1/preflight` performs the same validation, then uses the agent-owned
   config and prompts to report prompt size, SQL settings, attempt limits and
   the worst-case output-token ceiling and estimated maximum API cost.

@@ -3,12 +3,14 @@
 import unittest
 from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import yaml
 from docx import Document
 
 from agent.etl_specification import (
     build_etl_specification,
+    build_etl_specification_bundle,
     build_etl_specification_document,
 )
 from agent.validation import validate_spec_contents, validate_specs
@@ -124,11 +126,50 @@ class EtlSpecificationTest(unittest.TestCase):
             word.content,
             build_etl_specification(self.specs, "docx").content,
         )
+        with ZipFile(BytesIO(word.content)) as archive:
+            document_xml = archive.read("word/document.xml")
+            footer_xml = archive.read("word/footer1.xml")
+        self.assertIn(b"w:tblHeader", document_xml)
+        self.assertIn(b"w:cantSplit", document_xml)
+        self.assertIn(b"PAGE", footer_xml)
+        self.assertIn(b"NUMPAGES", footer_xml)
 
         self.assertTrue(pdf.content.startswith(b"%PDF"))
         self.assertEqual(
             pdf.content,
             build_etl_specification(self.specs, "pdf").content,
+        )
+
+    def test_bundles_separate_table_documents_deterministically(self):
+        visit_specs = validate_specs(
+            "visit_occurrence",
+            self.root / "specs",
+        )
+
+        artifact = build_etl_specification_bundle(
+            [self.specs, visit_specs],
+            "md",
+        )
+
+        self.assertEqual(artifact.media_type, "application/zip")
+        self.assertEqual(
+            artifact.file_name,
+            "omop_etl_specifications_md.zip",
+        )
+        with ZipFile(BytesIO(artifact.content)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                [
+                    "person_etl_specification.md",
+                    "visit_occurrence_etl_specification.md",
+                ],
+            )
+        self.assertEqual(
+            artifact.content,
+            build_etl_specification_bundle(
+                [visit_specs, self.specs],
+                "md",
+            ).content,
         )
 
 

@@ -155,6 +155,7 @@ Versioned endpoints:
 
 - `POST /v1/validate`
 - `POST /v1/etl-specification/{output_format}`
+- `POST /v1/etl-specification-bundle/{output_format}`
 - `POST /v1/preflight`
 - `POST /v1/generate`
 - `GET /v1/generation-options`
@@ -172,8 +173,9 @@ tokens.
 The `/v1/ddl` route remains as a backward-compatible SQL-only endpoint.
 The ETL specification endpoint accepts `md`, `docx` or `pdf`, validates the
 submitted mapping and source schemas, and creates a mapping diagram,
-field-level ETL table and change log. It is deterministic and does not call
-OpenAI.
+field-level ETL table and change log. The bundle endpoint packages separate
+documents for two to 50 tables in one ZIP. Both are deterministic and do not
+call OpenAI.
 
 ## Documentation
 

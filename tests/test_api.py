@@ -40,6 +40,21 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         cls.source_content = (
             specs_dir / "source_schema" / "cai_01_patient.yml"
         ).read_text(encoding="utf-8")
+        visit_mapping = yaml.safe_load(
+            (specs_dir / "mappings" / "visit_occurrence.yml").read_text(
+                encoding="utf-8"
+            )
+        )
+        for field_mapping in visit_mapping["fields"]:
+            if field_mapping.get("review_required"):
+                field_mapping["review_status"] = "approved"
+        cls.visit_mapping_content = yaml.safe_dump(
+            visit_mapping,
+            sort_keys=False,
+        )
+        cls.encounter_source_content = (
+            specs_dir / "source_schema" / "cai_02_encounter.yml"
+        ).read_text(encoding="utf-8")
 
     async def asyncSetUp(self):
         self.client = AsyncClient(
@@ -407,6 +422,54 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 409)
         self.assertIn("race_concept_id", response.json()["detail"])
+
+    async def test_downloads_multiple_etl_specifications_as_zip(self):
+        self.approve_mapping_reviews()
+        bundle_payload = {
+            "items": [
+                {
+                    "omop_table": "person",
+                    "mapping": self.payload["mapping"],
+                },
+                {
+                    "omop_table": "visit_occurrence",
+                    "mapping": {
+                        "file_name": "visit_occurrence.yml",
+                        "content": self.visit_mapping_content,
+                    },
+                },
+            ],
+            "source_schemas": [
+                *self.payload["source_schemas"],
+                {
+                    "file_name": "cai_02_encounter.yml",
+                    "content": self.encounter_source_content,
+                },
+            ],
+        }
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/etl-specification-bundle/md",
+                json=bundle_payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["content-type"],
+            "application/zip",
+        )
+        with ZipFile(BytesIO(response.content)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                [
+                    "person_etl_specification.md",
+                    "visit_occurrence_etl_specification.md",
+                ],
+            )
 
     async def test_validates_without_calling_openai(self):
         with patch.dict(

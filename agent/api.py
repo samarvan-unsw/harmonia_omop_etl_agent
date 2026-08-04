@@ -139,6 +139,55 @@ class ValidationRequest(StrictApiModel):
         return self
 
 
+class EtlSpecificationBundleItem(StrictApiModel):
+    """One OMOP mapping included in a multi-table documentation bundle."""
+
+    omop_table: OmopTable
+    mapping: YamlSpecification
+
+    @model_validator(mode="after")
+    def validate_mapping_name(self) -> "EtlSpecificationBundleItem":
+        if self.mapping.file_name != f"{self.omop_table}.yml":
+            raise ValueError(
+                f"mapping filename must be '{self.omop_table}.yml'"
+            )
+        return self
+
+
+class EtlSpecificationBundleRequest(StrictApiModel):
+    """Shared source schemas and mappings for a bounded ETL document ZIP."""
+
+    items: list[EtlSpecificationBundleItem] = Field(
+        min_length=2,
+        max_length=50,
+    )
+    source_schemas: list[YamlSpecification] = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    @model_validator(mode="after")
+    def validate_bundle_files(self) -> "EtlSpecificationBundleRequest":
+        tables = [item.omop_table for item in self.items]
+        if len(tables) != len(set(tables)):
+            raise ValueError("bundle OMOP tables must be unique")
+        source_names = [item.file_name for item in self.source_schemas]
+        if len(source_names) != len(set(source_names)):
+            raise ValueError("source schema filenames must be unique")
+        total_bytes = sum(
+            len(item.mapping.content.encode("utf-8"))
+            for item in self.items
+        ) + sum(
+            len(source.content.encode("utf-8"))
+            for source in self.source_schemas
+        )
+        if total_bytes > MAXIMUM_SPECIFICATION_BYTES:
+            raise ValueError(
+                "combined specification content exceeds the request limit"
+            )
+        return self
+
+
 class ValidationResponse(StrictApiModel):
     """Stable response returned by the validation API."""
 
@@ -919,6 +968,81 @@ def etl_specification(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The ETL specification exceeds the service limit.",
+        )
+
+    return Response(
+        content=artifact.content,
+        media_type=artifact.media_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": (
+                f'attachment; filename="{artifact.file_name}"'
+            ),
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@app.post(
+    "/v1/etl-specification-bundle/{output_format}",
+    response_class=Response,
+    dependencies=[Depends(require_api_token)],
+)
+def etl_specification_bundle(
+    output_format: EtlSpecificationFormat,
+    request: EtlSpecificationBundleRequest,
+) -> Response:
+    """Download separate table specifications in one deterministic ZIP."""
+    specifications: list[ValidatedSpecs] = []
+    pending: list[str] = []
+    for item in request.items:
+        validation_request = ValidationRequest(
+            omop_table=item.omop_table,
+            mapping=item.mapping,
+            source_schemas=request.source_schemas,
+        )
+        try:
+            specs = _validate_request_specifications(validation_request)
+        except SpecValidationError as error:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"{item.omop_table}: {error}",
+            ) from error
+        specifications.append(specs)
+        pending.extend(
+            f"{item.omop_table}.{field}"
+            for field in pending_review_fields(specs)
+        )
+
+    if pending:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Approve pending mapping reviews before creating an ETL "
+                "specification bundle: " + ", ".join(pending)
+            ),
+        )
+
+    from .etl_specification import build_etl_specification_bundle
+
+    try:
+        artifact = build_etl_specification_bundle(
+            specifications,
+            output_format,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+    if len(artifact.content) > MAXIMUM_ETL_SPECIFICATION_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "The ETL specification bundle exceeds the service limit. "
+                "Select fewer tables."
+            ),
         )
 
     return Response(
