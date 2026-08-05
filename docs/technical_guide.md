@@ -473,9 +473,10 @@ only the explicitly confirmed generation endpoint may do so.
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/etl-specification/{output_format}` accepts the same specification
   request and returns a validated `md`, `docx` or `pdf` document. It includes a
-  mapping-grid style diagram, field-level mapping table, source relationships
-  and change log without constructing an AI provider. Long Word and PDF tables
-  repeat their header, keep rows intact and include page numbering.
+  shared mapping-grid image, field-level mapping table, source relationships
+  and change log without constructing an AI provider. Word and PDF keep the
+  complete diagram on one portrait page, then use landscape pages for tables.
+  Long tables repeat their header, keep rows intact and include page numbering.
 - `POST /v1/etl-specification-bundle/{output_format}` accepts two to 50
   mappings with shared source schemas and returns one deterministic ZIP with a
   separate document per OMOP table. This preserves table-level pagination and
@@ -517,8 +518,9 @@ The dated pricing registry must exactly cover every allowlisted model.
 ## 6B. `agent/etl_specification.py`
 
 Builds ETL documentation from `ValidatedSpecs` in target-schema field order.
-The renderer-independent document model is shared by Markdown, landscape Word
-and landscape PDF renderers. Optional target fields absent from the mapping are
+The renderer-independent document model and one complete mapping-grid image
+are shared by Markdown, Word and PDF. Word and PDF use a portrait figure
+section and landscape table section. Optional target fields absent from the mapping are
 documented as explicit NULL outputs. Mapping `notes`, field `comment`, joins,
 `union_all`, lookup names and `change_log` entries remain traceable to the
 mapping YAML. This module is deterministic and never imports an AI provider.

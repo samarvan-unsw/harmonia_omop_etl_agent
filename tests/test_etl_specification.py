@@ -1,5 +1,7 @@
 """Verify deterministic ETL specification content and file renderers."""
 
+import base64
+import re
 import unittest
 from io import BytesIO
 from pathlib import Path
@@ -9,6 +11,7 @@ import yaml
 from docx import Document
 
 from agent.etl_specification import (
+    _mapping_figure_images,
     build_etl_specification,
     build_etl_specification_bundle,
     build_etl_specification_document,
@@ -99,7 +102,16 @@ class EtlSpecificationTest(unittest.TestCase):
 
         self.assertEqual(markdown.file_name, "person_etl_specification.md")
         markdown_text = markdown.content.decode("utf-8")
-        self.assertIn("```mermaid", markdown_text)
+        self.assertNotIn("```mermaid", markdown_text)
+        image_match = re.search(
+            r"data:image/png;base64,([^\)]+)",
+            markdown_text,
+        )
+        self.assertIsNotNone(image_match)
+        self.assertEqual(
+            base64.b64decode(image_match.group(1)),
+            _mapping_figure_images(self.specs)[0],
+        )
         self.assertIn(
             "| Destination Field | Source field | Logic | Comment field |",
             markdown_text,
@@ -112,6 +124,16 @@ class EtlSpecificationTest(unittest.TestCase):
             word_document.paragraphs[0].text,
             "person ETL specification",
         )
+        self.assertEqual(len(word_document.sections), 2)
+        self.assertLess(
+            word_document.sections[0].page_width,
+            word_document.sections[0].page_height,
+        )
+        self.assertGreater(
+            word_document.sections[1].page_width,
+            word_document.sections[1].page_height,
+        )
+        self.assertEqual(len(word_document.inline_shapes), 1)
         self.assertGreaterEqual(len(word_document.tables), 2)
         self.assertEqual(
             [cell.text for cell in word_document.tables[0].rows[0].cells],
@@ -129,12 +151,25 @@ class EtlSpecificationTest(unittest.TestCase):
         with ZipFile(BytesIO(word.content)) as archive:
             document_xml = archive.read("word/document.xml")
             footer_xml = archive.read("word/footer1.xml")
+            word_figure = archive.read("word/media/image1.png")
+        self.assertEqual(word_figure, _mapping_figure_images(self.specs)[0])
         self.assertIn(b"w:tblHeader", document_xml)
         self.assertIn(b"w:cantSplit", document_xml)
+        self.assertIn(b'<w:top w:w="160" w:type="dxa"', document_xml)
         self.assertIn(b"PAGE", footer_xml)
         self.assertIn(b"NUMPAGES", footer_xml)
 
         self.assertTrue(pdf.content.startswith(b"%PDF"))
+        media_boxes = re.findall(
+            rb"/MediaBox\s*\[\s*0\s+0\s+([0-9.]+)\s+([0-9.]+)\s*\]",
+            pdf.content,
+        )
+        self.assertTrue(
+            any(float(width) < float(height) for width, height in media_boxes)
+        )
+        self.assertTrue(
+            any(float(width) > float(height) for width, height in media_boxes)
+        )
         self.assertEqual(
             pdf.content,
             build_etl_specification(self.specs, "pdf").content,

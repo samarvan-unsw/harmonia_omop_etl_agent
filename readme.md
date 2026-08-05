@@ -173,9 +173,11 @@ tokens.
 The `/v1/ddl` route remains as a backward-compatible SQL-only endpoint.
 The ETL specification endpoint accepts `md`, `docx` or `pdf`, validates the
 submitted mapping and source schemas, and creates a mapping diagram,
-field-level ETL table and change log. The bundle endpoint packages separate
-documents for two to 50 tables in one ZIP. Both are deterministic and do not
-call OpenAI.
+field-level ETL table and change log. Markdown, Word and PDF reuse the same
+complete mapping-grid image. Word and PDF place that image on a portrait page
+and use landscape pages with repeating headers for the field tables. The
+bundle endpoint packages separate documents for two to 50 tables in one ZIP.
+Both are deterministic and do not call OpenAI.
 
 ## Documentation
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from base64 import b64encode
 from dataclasses import dataclass
 from html import escape as html_escape
 from io import BytesIO
@@ -10,25 +11,28 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from PIL import Image, ImageDraw, ImageFont
 from docx import Document
-from docx.enum.section import WD_ORIENT
+from docx.enum.section import WD_ORIENT, WD_SECTION
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Inches, Mm, Pt, RGBColor
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
+    BaseDocTemplate,
     CondPageBreak,
+    Frame,
     Image as PdfImage,
+    KeepTogether,
     LongTable,
+    NextPageTemplate,
     PageBreak,
+    PageTemplate,
     Paragraph,
-    SimpleDocTemplate,
-    Spacer,
     TableStyle,
 )
 
@@ -44,7 +48,6 @@ _MUTED = "536B65"
 _LINE = "DCE5E1"
 _AMBER = "C56F45"
 _MAXIMUM_ROWS = 500
-_FIGURE_ROWS_PER_IMAGE = 9
 
 
 @dataclass(frozen=True)
@@ -200,156 +203,13 @@ def _markdown_text(value: str) -> str:
     return html_escape(value, quote=False)
 
 
-def _mermaid_label(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', "&quot;")
-
-
-def _markdown_figure(specs: ValidatedSpecs) -> str:
-    """Mirror the mapping-grid graph structure in portable Mermaid."""
-    lines = ["```mermaid", "flowchart LR"]
-    source_nodes: dict[str, str] = {}
-    target_nodes: dict[str, str] = {}
-    lookup_nodes: dict[str, str] = {}
-    edges: list[tuple[str, str, str, str]] = []
-    mappings = {
-        mapping.target_field: mapping
-        for mapping in specs.mapping.fields
-    }
-
-    for model_name in specs.mapping.source_models:
-        model = specs.source_models[model_name]
-        relevant = {
-            reference.field
-            for mapping in specs.mapping.fields
-            for reference in mapping.source_fields
-            if reference.model == model_name
-        }
-        relevant.update(
-            reference.field
-            for join in specs.mapping.joins
-            for reference in (join.left, join.right)
-            if reference.model == model_name
-        )
-        for column in model.columns:
-            if column.name in relevant:
-                key = f"{model_name}.{column.name}"
-                source_nodes[key] = f"source_{len(source_nodes)}"
-
-    for target in specs.target_schema.fields:
-        target_nodes[target.name] = f"target_{len(target_nodes)}"
-
-    for mapping in specs.mapping.fields:
-        if mapping.action == "null":
-            continue
-        target_id = target_nodes[mapping.target_field]
-        next_node = target_id
-        if mapping.mapping_table_name:
-            lookup_id = f"lookup_{len(lookup_nodes)}"
-            lookup_nodes[mapping.target_field] = lookup_id
-            next_node = lookup_id
-            edges.append((lookup_id, target_id, "lookup", "lookup"))
-        for reference in mapping.source_fields:
-            source_key = f"{reference.model}.{reference.field}"
-            source_id = source_nodes[source_key]
-            kind = "lookup" if mapping.mapping_table_name else "mapping"
-            edges.append((source_id, next_node, "", kind))
-
-    for model_index, model_name in enumerate(specs.mapping.source_models):
-        lines.append(
-            f'  subgraph source_group_{model_index}["SOURCE · '
-            f'{_mermaid_label(model_name)}"]'
-        )
-        lines.append("    direction TB")
-        for label, node_id in source_nodes.items():
-            if label.startswith(f"{model_name}."):
-                field_name = label.removeprefix(f"{model_name}.")
-                lines.append(
-                    f'    {node_id}["{_mermaid_label(field_name)}"]'
-                )
-        lines.append("  end")
-    lines.append(
-        f'  subgraph target_group["TARGET · '
-        f'{_mermaid_label(specs.mapping.target_table)}"]'
-    )
-    lines.append("    direction TB")
-    for target in specs.target_schema.fields:
-        mapping = mappings.get(target.name)
-        status_label = (
-            "Not configured"
-            if mapping is None
-            else "NULL"
-            if mapping.action == "null"
-            else "Lookup"
-            if mapping.mapping_table_name
-            else "Transform"
-        )
-        requirement = "Required" if target.required else "Optional"
-        label = (
-            f"{target.name}<br/>{target.data_type} · "
-            f"{requirement} · {status_label}"
-        )
-        lines.append(
-            f'    {target_nodes[target.name]}["{_mermaid_label(label)}"]'
-        )
-    lines.append("  end")
-    for target_field, node_id in lookup_nodes.items():
-        mapping = mappings[target_field]
-        lines.append(
-            f'  {node_id}["{_mermaid_label(mapping.mapping_table_name or "")}'
-            f'<br/>Lookup table"]'
-        )
-    for edge_index, (source_id, target_id, label, kind) in enumerate(edges):
-        connector = f' -- "{label}" --> ' if label else " --> "
-        lines.append(f"  {source_id}{connector}{target_id}")
-        if kind == "lookup":
-            lines.append(f"  linkStyle {edge_index} stroke:#{_AMBER}")
-    for index, join in enumerate(specs.mapping.joins):
-        left = source_nodes[f"{join.left.model}.{join.left.field}"]
-        right = source_nodes[f"{join.right.model}.{join.right.field}"]
-        lines.append(
-            f'  {left} -. "{join.join_type.upper()}" .-> {right}'
-        )
-    if not edges:
-        lines.append('  empty["No configured source-field mappings"]')
-    lines.extend(
-        [
-            f"  classDef source fill:#{_GREEN_SOFT},stroke:#{_GREEN}",
-            "  classDef target fill:#E4EFF0,stroke:#356D73",
-            f"  classDef lookup fill:#FBE9DF,stroke:#{_AMBER}",
-            "  classDef null fill:#F4F7F5,stroke:#AEBBB6",
-            "  classDef unmapped fill:#F4F7F5,stroke:#DCE5E1",
-        ]
-    )
-    if source_nodes:
-        lines.append("  class " + ",".join(source_nodes.values()) + " source")
-    if target_nodes:
-        lines.append("  class " + ",".join(target_nodes.values()) + " target")
-    if lookup_nodes:
-        lines.append("  class " + ",".join(lookup_nodes.values()) + " lookup")
-    null_nodes = [
-        target_nodes[target.name]
-        for target in specs.target_schema.fields
-        if mappings.get(target.name)
-        and mappings[target.name].action == "null"
-    ]
-    unmapped_nodes = [
-        target_nodes[target.name]
-        for target in specs.target_schema.fields
-        if target.name not in mappings
-    ]
-    if null_nodes:
-        lines.append("  class " + ",".join(null_nodes) + " null")
-    if unmapped_nodes:
-        lines.append("  class " + ",".join(unmapped_nodes) + " unmapped")
-    lines.append("```")
-    return "\n".join(lines)
-
-
 def render_markdown(
     document: EtlSpecificationDocument,
     specs: ValidatedSpecs,
 ) -> bytes:
-    """Render a portable Markdown ETL specification."""
+    """Render a self-contained Markdown ETL specification."""
+    figure = _mapping_figure_images(specs)[0]
+    encoded_figure = b64encode(figure).decode("ascii")
     lines = [
         f"# {document.target_table} ETL specification",
         "",
@@ -367,7 +227,8 @@ def render_markdown(
         "",
         "## Mapping overview",
         "",
-        _markdown_figure(specs),
+        "![Source-to-OMOP mapping grid]"
+        f"(data:image/png;base64,{encoded_figure})",
         "",
     ]
     if document.relationships:
@@ -603,18 +464,8 @@ def _draw_mapping_card(
 
 
 def _mapping_figure_images(specs: ValidatedSpecs) -> list[bytes]:
-    """Render static pages with the mapping grid's node-and-edge language."""
-    targets = list(specs.target_schema.fields)
-    page_count = max(
-        1,
-        (len(targets) + _FIGURE_ROWS_PER_IMAGE - 1)
-        // _FIGURE_ROWS_PER_IMAGE,
-    )
-    rows_per_page = max(1, (len(targets) + page_count - 1) // page_count)
-    chunks = [
-        targets[index:index + rows_per_page]
-        for index in range(0, len(targets), rows_per_page)
-    ] or [[]]
+    """Render one complete mapping-grid image for every output format."""
+    chunks = [list(specs.target_schema.fields)]
     mappings = {
         mapping.target_field: mapping
         for mapping in specs.mapping.fields
@@ -937,6 +788,33 @@ def _set_docx_cell_text(cell, value: str, bold: bool = False) -> None:
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.TOP
 
 
+def _set_docx_cell_margins(
+    cell,
+    *,
+    top: int = 80,
+    bottom: int = 80,
+    start: int = 120,
+    end: int = 120,
+) -> None:
+    """Apply explicit DXA cell padding without imposing a fixed row height."""
+    properties = cell._tc.get_or_add_tcPr()
+    existing = properties.find(qn("w:tcMar"))
+    if existing is not None:
+        properties.remove(existing)
+    margins = OxmlElement("w:tcMar")
+    for edge, value in (
+        ("top", top),
+        ("start", start),
+        ("bottom", bottom),
+        ("end", end),
+    ):
+        margin = OxmlElement(f"w:{edge}")
+        margin.set(qn("w:w"), str(value))
+        margin.set(qn("w:type"), "dxa")
+        margins.append(margin)
+    properties.append(margins)
+
+
 def _add_docx_heading(document, text: str, level: int) -> None:
     heading = document.add_heading(text, level=level)
     heading.style.font.name = "Arial"
@@ -995,21 +873,20 @@ def render_docx(
     content: EtlSpecificationDocument,
     specs: ValidatedSpecs,
 ) -> bytes:
-    """Render a landscape Microsoft Word ETL specification."""
+    """Render a mixed-orientation Microsoft Word ETL specification."""
     document = Document()
     section = document.sections[0]
-    section.orientation = WD_ORIENT.LANDSCAPE
-    section.page_width, section.page_height = section.page_height, section.page_width
-    section.top_margin = Inches(0.55)
-    section.bottom_margin = Inches(0.55)
-    section.left_margin = Inches(0.55)
-    section.right_margin = Inches(0.55)
+    section.orientation = WD_ORIENT.PORTRAIT
+    section.page_width = Mm(210)
+    section.page_height = Mm(297)
+    section.top_margin = Mm(12)
+    section.bottom_margin = Mm(12)
+    section.left_margin = Mm(12)
+    section.right_margin = Mm(12)
     document.styles["Normal"].font.name = "Arial"
     document.styles["Normal"].font.size = Pt(9.5)
     document.core_properties.title = f"{content.target_table} ETL specification"
     document.core_properties.author = "CardiacAI OMOP Agent"
-    _add_docx_footer(document, content.target_table)
-
     title = document.add_heading(f"{content.target_table} ETL specification", 0)
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     title.style.font.name = "Arial"
@@ -1027,20 +904,27 @@ def render_docx(
     )
     _add_docx_heading(document, "Mapping overview", 1)
     figures = _mapping_figure_images(specs)
-    for index, figure in enumerate(figures):
-        with Image.open(BytesIO(figure)) as figure_image:
-            image_width, image_height = figure_image.size
-        scale = min(9.7 / image_width, 5.8 / image_height)
-        picture = document.add_picture(
-            BytesIO(figure),
-            width=Inches(image_width * scale),
-            height=Inches(image_height * scale),
-        )
-        picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if index < len(figures) - 1:
-            document.add_page_break()
+    figure = figures[0]
+    with Image.open(BytesIO(figure)) as figure_image:
+        image_width, image_height = figure_image.size
+    scale = min(7.15 / image_width, 7.25 / image_height)
+    picture = document.add_picture(
+        BytesIO(figure),
+        width=Inches(image_width * scale),
+        height=Inches(image_height * scale),
+    )
+    picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    document.add_page_break()
+    landscape_section = document.add_section(WD_SECTION.NEW_PAGE)
+    landscape_section.orientation = WD_ORIENT.LANDSCAPE
+    landscape_section.page_width = Mm(297)
+    landscape_section.page_height = Mm(210)
+    landscape_section.top_margin = Mm(12)
+    landscape_section.bottom_margin = Mm(12)
+    landscape_section.left_margin = Mm(12)
+    landscape_section.right_margin = Mm(12)
+    landscape_section.footer.is_linked_to_previous = True
+    _add_docx_footer(document, content.target_table)
 
     if content.relationships:
         _add_docx_heading(document, "Source relationships", 1)
@@ -1057,6 +941,8 @@ def render_docx(
         cell.width = widths[index]
         _shade_docx_cell(cell, _GREEN_SOFT)
         _set_docx_cell_text(cell, label, bold=True)
+        _set_docx_cell_margins(cell, top=160, bottom=160)
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     header_properties = table.rows[0]._tr.get_or_add_trPr()
     header_properties.append(OxmlElement("w:tblHeader"))
     _keep_docx_row_together(table.rows[0])
@@ -1069,6 +955,7 @@ def render_docx(
         ):
             cells[index].width = widths[index]
             _set_docx_cell_text(cells[index], value)
+            _set_docx_cell_margins(cells[index])
 
     _add_docx_heading(document, "Change log", 1)
     change_table = document.add_table(rows=1, cols=3)
@@ -1079,6 +966,8 @@ def render_docx(
     ):
         _shade_docx_cell(cell, _GREEN_SOFT)
         _set_docx_cell_text(cell, label, bold=True)
+        _set_docx_cell_margins(cell, top=160, bottom=160)
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
     change_header_properties = change_table.rows[0]._tr.get_or_add_trPr()
     change_header_properties.append(OxmlElement("w:tblHeader"))
     _keep_docx_row_together(change_table.rows[0])
@@ -1089,6 +978,7 @@ def render_docx(
         cells = change_row.cells
         for cell, value in zip(cells, change):
             _set_docx_cell_text(cell, value)
+            _set_docx_cell_margins(cell)
 
     buffer = BytesIO()
     document.save(buffer)
@@ -1106,11 +996,11 @@ def render_pdf(
     content: EtlSpecificationDocument,
     specs: ValidatedSpecs,
 ) -> bytes:
-    """Render a landscape A4 PDF ETL specification."""
+    """Render a mixed-orientation A4 PDF ETL specification."""
     buffer = BytesIO()
-    pdf = SimpleDocTemplate(
+    pdf = BaseDocTemplate(
         buffer,
-        pagesize=landscape(A4),
+        pagesize=A4,
         rightMargin=12 * mm,
         leftMargin=12 * mm,
         topMargin=10 * mm,
@@ -1165,13 +1055,69 @@ def render_pdf(
         canvas.saveState()
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(colors.HexColor(f"#{_MUTED}"))
+        page_width, _ = canvas._pagesize
         canvas.drawRightString(
-            landscape(A4)[0] - 12 * mm,
+            page_width - 12 * mm,
             5 * mm,
             f"{content.target_table} ETL specification  ·  "
             f"Page {document.page}",
         )
         canvas.restoreState()
+
+    portrait_width, portrait_height = A4
+    landscape_width, landscape_height = landscape(A4)
+    portrait_frame = Frame(
+        12 * mm,
+        10 * mm,
+        portrait_width - 24 * mm,
+        portrait_height - 20 * mm,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        id="portrait_frame",
+    )
+    landscape_frame = Frame(
+        12 * mm,
+        10 * mm,
+        landscape_width - 24 * mm,
+        landscape_height - 20 * mm,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        id="landscape_frame",
+    )
+    pdf.addPageTemplates([
+        PageTemplate(
+            id="portrait",
+            frames=[portrait_frame],
+            pagesize=A4,
+            onPage=add_page_footer,
+        ),
+        PageTemplate(
+            id="landscape",
+            frames=[landscape_frame],
+            pagesize=landscape(A4),
+            onPage=add_page_footer,
+        ),
+    ])
+
+    overview = _pdf_paragraph(
+        content.table_notes
+        or content.table_description
+        or "No table-level notes recorded.",
+        body_style,
+    )
+    figure = _mapping_figure_images(specs)[0]
+    image = PdfImage(BytesIO(figure))
+    scale = min(
+        (185 * mm) / image.imageWidth,
+        (180 * mm) / image.imageHeight,
+        1,
+    )
+    image.drawWidth = image.imageWidth * scale
+    image.drawHeight = image.imageHeight * scale
 
     story = [
         Paragraph(
@@ -1184,36 +1130,24 @@ def render_pdf(
             "no AI request",
             body_style,
         ),
-        Paragraph("Overview", heading_style),
-        _pdf_paragraph(
-            content.table_notes
-            or content.table_description
-            or "No table-level notes recorded.",
-            body_style,
-        ),
-        Paragraph("Mapping overview", heading_style),
+        KeepTogether([
+            Paragraph("Overview", heading_style),
+            overview,
+        ]),
+        KeepTogether([
+            Paragraph("Mapping overview", heading_style),
+            image,
+        ]),
+        NextPageTemplate("landscape"),
+        PageBreak(),
     ]
-    figures = _mapping_figure_images(specs)
-    for index, figure in enumerate(figures):
-        image = PdfImage(BytesIO(figure))
-        scale = min(
-            (255 * mm) / image.imageWidth,
-            (125 * mm) / image.imageHeight,
-            1,
-        )
-        image.drawWidth = image.imageWidth * scale
-        image.drawHeight = image.imageHeight * scale
-        story.extend([image, Spacer(1, 3 * mm)])
-        if index < len(figures) - 1:
-            story.append(PageBreak())
-    story.append(PageBreak())
     if content.relationships:
         story.append(Paragraph("Source relationships", heading_style))
         for relationship in content.relationships:
             story.append(_pdf_paragraph(f"• {relationship}", body_style))
 
     story.extend([
-        CondPageBreak(35 * mm),
+        CondPageBreak(45 * mm),
         Paragraph("Field mapping", heading_style),
     ])
     table_data = [[
@@ -1248,6 +1182,9 @@ def render_pdf(
                 ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, 0), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
                 (
                     "ROWBACKGROUNDS",
                     (0, 1),
@@ -1258,7 +1195,10 @@ def render_pdf(
         )
     )
     story.append(mapping_table)
-    story.append(Paragraph("Change log", heading_style))
+    story.extend([
+        CondPageBreak(35 * mm),
+        Paragraph("Change log", heading_style),
+    ])
     changes = content.changes or (("—", "No changes recorded.", "—"),)
     change_data = [[
         Paragraph("Date", header_style),
@@ -1286,15 +1226,14 @@ def render_pdf(
                 ("RIGHTPADDING", (0, 0), (-1, -1), 4),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, 0), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
             ]
         )
     )
     story.append(change_table)
-    pdf.build(
-        story,
-        onFirstPage=add_page_footer,
-        onLaterPages=add_page_footer,
-    )
+    pdf.build(story)
     return buffer.getvalue()
 
 
