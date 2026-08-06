@@ -282,6 +282,35 @@ def render_markdown(
     return "\n".join(lines).encode("utf-8")
 
 
+def render_markdown_collection(
+    entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+) -> bytes:
+    """Render multiple OMOP table sections in one Markdown document."""
+    lines = [
+        "# OMOP ETL specification",
+        "",
+        "**Generation method:** Deterministic; no AI request",
+        "",
+        "## Included tables",
+        "",
+        *(
+            f"- {_markdown_text(document.target_table)}"
+            for document, _ in entries
+        ),
+        "",
+    ]
+    for document, specs in entries:
+        table_lines = render_markdown(document, specs).decode("utf-8").splitlines()
+        for line in table_lines:
+            if line.startswith("## "):
+                lines.append(f"### {line[3:]}")
+            elif line.startswith("# "):
+                lines.append(f"## {line[2:]}")
+            else:
+                lines.append(line)
+    return "\n".join(lines).encode("utf-8")
+
+
 def _font(size: int, bold: bool = False):
     name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
     try:
@@ -869,24 +898,36 @@ def _normalize_docx_archive(content: bytes) -> bytes:
     return output_buffer.getvalue()
 
 
-def render_docx(
-    content: EtlSpecificationDocument,
-    specs: ValidatedSpecs,
-) -> bytes:
-    """Render a mixed-orientation Microsoft Word ETL specification."""
-    document = Document()
-    section = document.sections[0]
-    section.orientation = WD_ORIENT.PORTRAIT
-    section.page_width = Mm(210)
-    section.page_height = Mm(297)
+def _configure_docx_section(section, orientation: WD_ORIENT) -> None:
+    """Apply the stable A4 geometry for one Word section."""
+    section.orientation = orientation
+    if orientation == WD_ORIENT.PORTRAIT:
+        section.page_width = Mm(210)
+        section.page_height = Mm(297)
+    else:
+        section.page_width = Mm(297)
+        section.page_height = Mm(210)
     section.top_margin = Mm(12)
     section.bottom_margin = Mm(12)
     section.left_margin = Mm(12)
     section.right_margin = Mm(12)
-    document.styles["Normal"].font.name = "Arial"
-    document.styles["Normal"].font.size = Pt(9.5)
-    document.core_properties.title = f"{content.target_table} ETL specification"
-    document.core_properties.author = "CardiacAI OMOP Agent"
+
+
+def _append_docx_specification(
+    document,
+    content: EtlSpecificationDocument,
+    specs: ValidatedSpecs,
+    *,
+    first: bool,
+) -> None:
+    """Append one portrait overview and landscape table section."""
+    if first:
+        portrait_section = document.sections[0]
+    else:
+        portrait_section = document.add_section(WD_SECTION.NEW_PAGE)
+        portrait_section.footer.is_linked_to_previous = True
+    _configure_docx_section(portrait_section, WD_ORIENT.PORTRAIT)
+
     title = document.add_heading(f"{content.target_table} ETL specification", 0)
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     title.style.font.name = "Arial"
@@ -903,8 +944,7 @@ def render_docx(
         or "No table-level notes recorded."
     )
     _add_docx_heading(document, "Mapping overview", 1)
-    figures = _mapping_figure_images(specs)
-    figure = figures[0]
+    figure = _mapping_figure_images(specs)[0]
     with Image.open(BytesIO(figure)) as figure_image:
         image_width, image_height = figure_image.size
     scale = min(7.15 / image_width, 7.25 / image_height)
@@ -916,15 +956,8 @@ def render_docx(
     picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     landscape_section = document.add_section(WD_SECTION.NEW_PAGE)
-    landscape_section.orientation = WD_ORIENT.LANDSCAPE
-    landscape_section.page_width = Mm(297)
-    landscape_section.page_height = Mm(210)
-    landscape_section.top_margin = Mm(12)
-    landscape_section.bottom_margin = Mm(12)
-    landscape_section.left_margin = Mm(12)
-    landscape_section.right_margin = Mm(12)
+    _configure_docx_section(landscape_section, WD_ORIENT.LANDSCAPE)
     landscape_section.footer.is_linked_to_previous = True
-    _add_docx_footer(document, content.target_table)
 
     if content.relationships:
         _add_docx_heading(document, "Source relationships", 1)
@@ -980,9 +1013,56 @@ def render_docx(
             _set_docx_cell_text(cell, value)
             _set_docx_cell_margins(cell)
 
+
+def _render_docx_collection(
+    entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+    *,
+    document_title: str,
+    footer_title: str,
+) -> bytes:
+    """Render one Word file containing one section pair per OMOP table."""
+    document = Document()
+    section = document.sections[0]
+    section.orientation = WD_ORIENT.PORTRAIT
+    document.styles["Normal"].font.name = "Arial"
+    document.styles["Normal"].font.size = Pt(9.5)
+    document.core_properties.title = document_title
+    document.core_properties.author = "CardiacAI OMOP Agent"
+    for index, (content, specs) in enumerate(entries):
+        _append_docx_specification(
+            document,
+            content,
+            specs,
+            first=index == 0,
+        )
+    _add_docx_footer(document, footer_title)
+
     buffer = BytesIO()
     document.save(buffer)
     return _normalize_docx_archive(buffer.getvalue())
+
+
+def render_docx(
+    content: EtlSpecificationDocument,
+    specs: ValidatedSpecs,
+) -> bytes:
+    """Render a mixed-orientation Microsoft Word ETL specification."""
+    return _render_docx_collection(
+        ((content, specs),),
+        document_title=f"{content.target_table} ETL specification",
+        footer_title=content.target_table,
+    )
+
+
+def render_docx_collection(
+    entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+) -> bytes:
+    """Render multiple OMOP table specifications in one Word file."""
+    return _render_docx_collection(
+        entries,
+        document_title="OMOP ETL specification",
+        footer_title="OMOP",
+    )
 
 
 def _pdf_paragraph(value: str, style: ParagraphStyle) -> Paragraph:
@@ -992,116 +1072,21 @@ def _pdf_paragraph(value: str, style: ParagraphStyle) -> Paragraph:
     )
 
 
-def render_pdf(
+def _pdf_specification_story(
     content: EtlSpecificationDocument,
     specs: ValidatedSpecs,
-) -> bytes:
-    """Render a mixed-orientation A4 PDF ETL specification."""
-    buffer = BytesIO()
-    pdf = BaseDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=12 * mm,
-        leftMargin=12 * mm,
-        topMargin=10 * mm,
-        bottomMargin=10 * mm,
-        invariant=1,
-        title=f"{content.target_table} ETL specification",
-        author="CardiacAI OMOP Agent",
-    )
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        "EtlTitle",
-        parent=styles["Title"],
-        fontName="Helvetica-Bold",
-        fontSize=22,
-        leading=26,
-        textColor=colors.HexColor(f"#{_INK}"),
-        spaceAfter=8,
-    )
-    heading_style = ParagraphStyle(
-        "EtlHeading",
-        parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
-        fontSize=13,
-        leading=16,
-        textColor=colors.HexColor(f"#{_GREEN}"),
-        spaceBefore=9,
-        spaceAfter=5,
-    )
-    body_style = ParagraphStyle(
-        "EtlBody",
-        parent=styles["BodyText"],
-        fontName="Helvetica",
-        fontSize=8.5,
-        leading=11,
-        textColor=colors.HexColor(f"#{_INK}"),
-    )
-    small_style = ParagraphStyle(
-        "EtlSmall",
-        parent=body_style,
-        fontSize=7.5,
-        leading=9.5,
-    )
-    header_style = ParagraphStyle(
-        "EtlHeader",
-        parent=small_style,
-        fontName="Helvetica-Bold",
-        alignment=TA_CENTER,
-        textColor=colors.HexColor(f"#{_GREEN}"),
-    )
-
-    def add_page_footer(canvas, document) -> None:
-        canvas.saveState()
-        canvas.setFont("Helvetica", 7.5)
-        canvas.setFillColor(colors.HexColor(f"#{_MUTED}"))
-        page_width, _ = canvas._pagesize
-        canvas.drawRightString(
-            page_width - 12 * mm,
-            5 * mm,
-            f"{content.target_table} ETL specification  ·  "
-            f"Page {document.page}",
-        )
-        canvas.restoreState()
-
-    portrait_width, portrait_height = A4
-    landscape_width, landscape_height = landscape(A4)
-    portrait_frame = Frame(
-        12 * mm,
-        10 * mm,
-        portrait_width - 24 * mm,
-        portrait_height - 20 * mm,
-        leftPadding=0,
-        rightPadding=0,
-        topPadding=0,
-        bottomPadding=0,
-        id="portrait_frame",
-    )
-    landscape_frame = Frame(
-        12 * mm,
-        10 * mm,
-        landscape_width - 24 * mm,
-        landscape_height - 20 * mm,
-        leftPadding=0,
-        rightPadding=0,
-        topPadding=0,
-        bottomPadding=0,
-        id="landscape_frame",
-    )
-    pdf.addPageTemplates([
-        PageTemplate(
-            id="portrait",
-            frames=[portrait_frame],
-            pagesize=A4,
-            onPage=add_page_footer,
-        ),
-        PageTemplate(
-            id="landscape",
-            frames=[landscape_frame],
-            pagesize=landscape(A4),
-            onPage=add_page_footer,
-        ),
-    ])
+    *,
+    title_style: ParagraphStyle,
+    heading_style: ParagraphStyle,
+    body_style: ParagraphStyle,
+    small_style: ParagraphStyle,
+    header_style: ParagraphStyle,
+    start_new_portrait_page: bool,
+) -> list:
+    """Build the portrait overview and landscape tables for one target."""
+    story = []
+    if start_new_portrait_page:
+        story.extend([NextPageTemplate("portrait"), PageBreak()])
 
     overview = _pdf_paragraph(
         content.table_notes
@@ -1119,7 +1104,7 @@ def render_pdf(
     image.drawWidth = image.imageWidth * scale
     image.drawHeight = image.imageHeight * scale
 
-    story = [
+    story.extend([
         Paragraph(
             f"{html_escape(content.target_table)} ETL specification",
             title_style,
@@ -1140,7 +1125,7 @@ def render_pdf(
         ]),
         NextPageTemplate("landscape"),
         PageBreak(),
-    ]
+    ])
     if content.relationships:
         story.append(Paragraph("Source relationships", heading_style))
         for relationship in content.relationships:
@@ -1233,8 +1218,161 @@ def render_pdf(
         )
     )
     story.append(change_table)
+    return story
+
+
+def _render_pdf_collection(
+    entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+    *,
+    document_title: str,
+    footer_title: str,
+) -> bytes:
+    """Render one mixed-orientation PDF containing all selected tables."""
+    buffer = BytesIO()
+    pdf = BaseDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=12 * mm,
+        leftMargin=12 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+        invariant=1,
+        title=document_title,
+        author="CardiacAI OMOP Agent",
+    )
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "EtlTitle",
+        parent=styles["Title"],
+        fontName="Helvetica-Bold",
+        fontSize=22,
+        leading=26,
+        textColor=colors.HexColor(f"#{_INK}"),
+        spaceAfter=8,
+    )
+    heading_style = ParagraphStyle(
+        "EtlHeading",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=13,
+        leading=16,
+        textColor=colors.HexColor(f"#{_GREEN}"),
+        spaceBefore=9,
+        spaceAfter=5,
+    )
+    body_style = ParagraphStyle(
+        "EtlBody",
+        parent=styles["BodyText"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor(f"#{_INK}"),
+    )
+    small_style = ParagraphStyle(
+        "EtlSmall",
+        parent=body_style,
+        fontSize=7.5,
+        leading=9.5,
+    )
+    header_style = ParagraphStyle(
+        "EtlHeader",
+        parent=small_style,
+        fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
+        textColor=colors.HexColor(f"#{_GREEN}"),
+    )
+
+    def add_page_footer(canvas, document) -> None:
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(colors.HexColor(f"#{_MUTED}"))
+        page_width, _ = canvas._pagesize
+        canvas.drawRightString(
+            page_width - 12 * mm,
+            5 * mm,
+            f"{footer_title} ETL specification  ·  "
+            f"Page {document.page}",
+        )
+        canvas.restoreState()
+
+    portrait_width, portrait_height = A4
+    landscape_width, landscape_height = landscape(A4)
+    portrait_frame = Frame(
+        12 * mm,
+        10 * mm,
+        portrait_width - 24 * mm,
+        portrait_height - 20 * mm,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        id="portrait_frame",
+    )
+    landscape_frame = Frame(
+        12 * mm,
+        10 * mm,
+        landscape_width - 24 * mm,
+        landscape_height - 20 * mm,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        id="landscape_frame",
+    )
+    pdf.addPageTemplates([
+        PageTemplate(
+            id="portrait",
+            frames=[portrait_frame],
+            pagesize=A4,
+            onPage=add_page_footer,
+        ),
+        PageTemplate(
+            id="landscape",
+            frames=[landscape_frame],
+            pagesize=landscape(A4),
+            onPage=add_page_footer,
+        ),
+    ])
+
+    story = []
+    for index, (content, specs) in enumerate(entries):
+        story.extend(
+            _pdf_specification_story(
+                content,
+                specs,
+                title_style=title_style,
+                heading_style=heading_style,
+                body_style=body_style,
+                small_style=small_style,
+                header_style=header_style,
+                start_new_portrait_page=index > 0,
+            )
+        )
     pdf.build(story)
     return buffer.getvalue()
+
+
+def render_pdf(
+    content: EtlSpecificationDocument,
+    specs: ValidatedSpecs,
+) -> bytes:
+    """Render a mixed-orientation A4 PDF ETL specification."""
+    return _render_pdf_collection(
+        ((content, specs),),
+        document_title=f"{content.target_table} ETL specification",
+        footer_title=content.target_table,
+    )
+
+
+def render_pdf_collection(
+    entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+) -> bytes:
+    """Render multiple OMOP table specifications in one PDF file."""
+    return _render_pdf_collection(
+        entries,
+        document_title="OMOP ETL specification",
+        footer_title="OMOP",
+    )
 
 
 def build_etl_specification(
@@ -1266,35 +1404,37 @@ def build_etl_specification_bundle(
     specifications: list[ValidatedSpecs],
     output_format: EtlSpecificationFormat,
 ) -> EtlSpecificationArtifact:
-    """Package multiple deterministic table documents in a stable ZIP."""
+    """Render multiple validated mappings in one deterministic document."""
     if len(specifications) < 2:
         raise ValueError("An ETL specification bundle requires two tables.")
 
-    artifacts = sorted(
-        (
-            build_etl_specification(specs, output_format)
-            for specs in specifications
-        ),
-        key=lambda artifact: artifact.file_name,
+    entries = tuple(
+        sorted(
+            (
+                (build_etl_specification_document(specs), specs)
+                for specs in specifications
+            ),
+            key=lambda entry: entry[0].target_table,
+        )
     )
-    output = BytesIO()
-    with ZipFile(
-        output,
-        "w",
-        compression=ZIP_DEFLATED,
-        compresslevel=9,
-    ) as archive:
-        for artifact in artifacts:
-            entry = ZipInfo(
-                artifact.file_name,
-                date_time=(1980, 1, 1, 0, 0, 0),
-            )
-            entry.compress_type = ZIP_DEFLATED
-            entry.external_attr = 0o644 << 16
-            archive.writestr(entry, artifact.content)
+    renderers = {
+        "md": (
+            render_markdown_collection,
+            "text/markdown; charset=utf-8",
+        ),
+        "docx": (
+            render_docx_collection,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ),
+        "pdf": (render_pdf_collection, "application/pdf"),
+    }
+    renderer, media_type = renderers[output_format]
+    content = renderer(entries)
+    if not content:
+        raise ValueError("The combined ETL specification is empty.")
 
     return EtlSpecificationArtifact(
-        content=output.getvalue(),
-        file_name=f"omop_etl_specifications_{output_format}.zip",
-        media_type="application/zip",
+        content=content,
+        file_name=f"omop_etl_specification.{output_format}",
+        media_type=media_type,
     )

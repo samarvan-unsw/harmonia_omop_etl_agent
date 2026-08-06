@@ -560,7 +560,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 409)
         self.assertIn("race_concept_id", response.json()["detail"])
 
-    async def test_downloads_multiple_etl_specifications_as_zip(self):
+    async def test_downloads_multiple_etl_specifications_as_one_document(self):
         self.approve_mapping_reviews()
         bundle_payload = {
             "items": [
@@ -597,16 +597,15 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.headers["content-type"],
-            "application/zip",
+            "text/markdown; charset=utf-8",
         )
-        with ZipFile(BytesIO(response.content)) as archive:
-            self.assertEqual(
-                archive.namelist(),
-                [
-                    "person_etl_specification.md",
-                    "visit_occurrence_etl_specification.md",
-                ],
-            )
+        self.assertIn(
+            'filename="omop_etl_specification.md"',
+            response.headers["content-disposition"],
+        )
+        document = response.content.decode("utf-8")
+        self.assertIn("## person ETL specification", document)
+        self.assertIn("## visit_occurrence ETL specification", document)
 
     async def test_validates_without_calling_openai(self):
         with patch.dict(

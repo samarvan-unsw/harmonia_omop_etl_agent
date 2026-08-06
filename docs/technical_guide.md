@@ -482,9 +482,9 @@ only the explicitly confirmed generation endpoint may do so.
   complete diagram on one portrait page, then use landscape pages for tables.
   Long tables repeat their header, keep rows intact and include page numbering.
 - `POST /v1/etl-specification-bundle/{output_format}` accepts two to 50
-  mappings with shared source schemas and returns one deterministic ZIP with a
-  separate document per OMOP table. This preserves table-level pagination and
-  review ownership while supporting multi-table UI downloads.
+  mappings with shared source schemas and returns one deterministic document
+  containing a clearly separated section for every selected OMOP table. Each
+  table retains its own diagram, field table, relationships and change log.
 - `POST /v1/preflight` performs the same validation, then uses the agent-owned
   config and prompts to report prompt size, SQL settings, attempt limits and
   the worst-case output-token ceiling and estimated maximum API cost.

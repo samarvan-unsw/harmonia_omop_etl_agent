@@ -175,37 +175,65 @@ class EtlSpecificationTest(unittest.TestCase):
             build_etl_specification(self.specs, "pdf").content,
         )
 
-    def test_bundles_separate_table_documents_deterministically(self):
+    def test_combines_tables_in_one_document_deterministically(self):
         visit_specs = validate_specs(
             "visit_occurrence",
             self.root / "specs",
         )
 
-        artifact = build_etl_specification_bundle(
-            [self.specs, visit_specs],
-            "md",
+        markdown = build_etl_specification_bundle(
+            [self.specs, visit_specs], "md"
+        )
+        word = build_etl_specification_bundle(
+            [self.specs, visit_specs], "docx"
+        )
+        pdf = build_etl_specification_bundle(
+            [self.specs, visit_specs], "pdf"
         )
 
-        self.assertEqual(artifact.media_type, "application/zip")
         self.assertEqual(
-            artifact.file_name,
-            "omop_etl_specifications_md.zip",
+            markdown.media_type,
+            "text/markdown; charset=utf-8",
         )
-        with ZipFile(BytesIO(artifact.content)) as archive:
+        self.assertEqual(markdown.file_name, "omop_etl_specification.md")
+        markdown_text = markdown.content.decode("utf-8")
+        self.assertEqual(markdown_text.count("# OMOP ETL specification"), 1)
+        self.assertIn("## person ETL specification", markdown_text)
+        self.assertIn("## visit_occurrence ETL specification", markdown_text)
+
+        self.assertEqual(
+            word.media_type,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        self.assertEqual(word.file_name, "omop_etl_specification.docx")
+        word_document = Document(BytesIO(word.content))
+        self.assertEqual(len(word_document.inline_shapes), 2)
+        self.assertEqual(len(word_document.sections), 4)
+        self.assertIn(
+            "person ETL specification",
+            [paragraph.text for paragraph in word_document.paragraphs],
+        )
+        self.assertIn(
+            "visit_occurrence ETL specification",
+            [paragraph.text for paragraph in word_document.paragraphs],
+        )
+
+        self.assertEqual(pdf.media_type, "application/pdf")
+        self.assertEqual(pdf.file_name, "omop_etl_specification.pdf")
+        self.assertTrue(pdf.content.startswith(b"%PDF"))
+
+        for output_format, artifact in (
+            ("md", markdown),
+            ("docx", word),
+            ("pdf", pdf),
+        ):
             self.assertEqual(
-                archive.namelist(),
-                [
-                    "person_etl_specification.md",
-                    "visit_occurrence_etl_specification.md",
-                ],
+                artifact.content,
+                build_etl_specification_bundle(
+                    [visit_specs, self.specs],
+                    output_format,
+                ).content,
             )
-        self.assertEqual(
-            artifact.content,
-            build_etl_specification_bundle(
-                [visit_specs, self.specs],
-                "md",
-            ).content,
-        )
 
 
 if __name__ == "__main__":

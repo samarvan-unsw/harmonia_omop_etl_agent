@@ -146,7 +146,7 @@ class ValidationRequest(StrictApiModel):
 
 
 class EtlSpecificationBundleItem(StrictApiModel):
-    """One OMOP mapping included in a multi-table documentation bundle."""
+    """One OMOP mapping included in a combined documentation request."""
 
     omop_table: OmopTable
     mapping: YamlSpecification
@@ -161,7 +161,7 @@ class EtlSpecificationBundleItem(StrictApiModel):
 
 
 class EtlSpecificationBundleRequest(StrictApiModel):
-    """Shared source schemas and mappings for a bounded ETL document ZIP."""
+    """Shared source schemas and mappings for one bounded ETL document."""
 
     items: list[EtlSpecificationBundleItem] = Field(
         min_length=2,
@@ -176,7 +176,7 @@ class EtlSpecificationBundleRequest(StrictApiModel):
     def validate_bundle_files(self) -> "EtlSpecificationBundleRequest":
         tables = [item.omop_table for item in self.items]
         if len(tables) != len(set(tables)):
-            raise ValueError("bundle OMOP tables must be unique")
+            raise ValueError("selected OMOP tables must be unique")
         source_names = [item.file_name for item in self.source_schemas]
         if len(source_names) != len(set(source_names)):
             raise ValueError("source schema filenames must be unique")
@@ -1033,7 +1033,7 @@ def etl_specification_bundle(
     output_format: EtlSpecificationFormat,
     request: EtlSpecificationBundleRequest,
 ) -> Response:
-    """Download separate table specifications in one deterministic ZIP."""
+    """Download selected table specifications in one deterministic file."""
     specifications: list[ValidatedSpecs] = []
     pending: list[str] = []
     for item in request.items:
@@ -1060,7 +1060,7 @@ def etl_specification_bundle(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "Approve pending mapping reviews before creating an ETL "
-                "specification bundle: " + ", ".join(pending)
+                "specification: " + ", ".join(pending)
             ),
         )
 
@@ -1081,7 +1081,7 @@ def etl_specification_bundle(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "The ETL specification bundle exceeds the service limit. "
+                "The combined ETL specification exceeds the service limit. "
                 "Select fewer tables."
             ),
         )
