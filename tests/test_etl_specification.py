@@ -11,6 +11,7 @@ import yaml
 from docx import Document
 
 from agent.etl_specification import (
+    _PROJECT_PURPOSE,
     _mapping_figure_images,
     build_etl_specification,
     build_etl_specification_bundle,
@@ -96,12 +97,18 @@ class EtlSpecificationTest(unittest.TestCase):
         )
 
     def test_renders_markdown_word_and_pdf_without_ai(self):
-        markdown = build_etl_specification(self.specs, "md")
-        word = build_etl_specification(self.specs, "docx")
-        pdf = build_etl_specification(self.specs, "pdf")
+        project = {
+            "project_name": "CardiacAI OMOP",
+            "project_description": "Maps project source data into OMOP CDM.",
+        }
+        markdown = build_etl_specification(self.specs, "md", **project)
+        word = build_etl_specification(self.specs, "docx", **project)
+        pdf = build_etl_specification(self.specs, "pdf", **project)
 
         self.assertEqual(markdown.file_name, "person_etl_specification.md")
         markdown_text = markdown.content.decode("utf-8")
+        self.assertTrue(markdown_text.startswith("# CardiacAI OMOP\n"))
+        self.assertIn(_PROJECT_PURPOSE, markdown_text)
         self.assertNotIn("```mermaid", markdown_text)
         image_match = re.search(
             r"data:image/png;base64,([^\)]+)",
@@ -116,13 +123,17 @@ class EtlSpecificationTest(unittest.TestCase):
             "| Destination Field | Source field | Logic | Comment field |",
             markdown_text,
         )
-        self.assertIn("## Change log", markdown_text)
+        self.assertIn("### Change log", markdown_text)
 
         self.assertTrue(word.content.startswith(b"PK\x03\x04"))
         word_document = Document(BytesIO(word.content))
         self.assertEqual(
             word_document.paragraphs[0].text,
+            "CardiacAI OMOP",
+        )
+        self.assertIn(
             "person ETL specification",
+            [paragraph.text for paragraph in word_document.paragraphs],
         )
         self.assertEqual(len(word_document.sections), 2)
         self.assertLess(
@@ -146,7 +157,11 @@ class EtlSpecificationTest(unittest.TestCase):
         )
         self.assertEqual(
             word.content,
-            build_etl_specification(self.specs, "docx").content,
+            build_etl_specification(
+                self.specs,
+                "docx",
+                **project,
+            ).content,
         )
         with ZipFile(BytesIO(word.content)) as archive:
             document_xml = archive.read("word/document.xml")
@@ -172,7 +187,11 @@ class EtlSpecificationTest(unittest.TestCase):
         )
         self.assertEqual(
             pdf.content,
-            build_etl_specification(self.specs, "pdf").content,
+            build_etl_specification(
+                self.specs,
+                "pdf",
+                **project,
+            ).content,
         )
 
     def test_combines_tables_in_one_document_deterministically(self):
@@ -181,14 +200,18 @@ class EtlSpecificationTest(unittest.TestCase):
             self.root / "specs",
         )
 
+        project = {
+            "project_name": "CardiacAI OMOP",
+            "project_description": "Maps project source data into OMOP CDM.",
+        }
         markdown = build_etl_specification_bundle(
-            [self.specs, visit_specs], "md"
+            [self.specs, visit_specs], "md", **project
         )
         word = build_etl_specification_bundle(
-            [self.specs, visit_specs], "docx"
+            [self.specs, visit_specs], "docx", **project
         )
         pdf = build_etl_specification_bundle(
-            [self.specs, visit_specs], "pdf"
+            [self.specs, visit_specs], "pdf", **project
         )
 
         self.assertEqual(
@@ -197,7 +220,8 @@ class EtlSpecificationTest(unittest.TestCase):
         )
         self.assertEqual(markdown.file_name, "omop_etl_specification.md")
         markdown_text = markdown.content.decode("utf-8")
-        self.assertEqual(markdown_text.count("# OMOP ETL specification"), 1)
+        self.assertTrue(markdown_text.startswith("# CardiacAI OMOP\n"))
+        self.assertEqual(markdown_text.count("## OMOP ETL specification"), 1)
         self.assertIn("## person ETL specification", markdown_text)
         self.assertIn("## visit_occurrence ETL specification", markdown_text)
 
@@ -232,6 +256,7 @@ class EtlSpecificationTest(unittest.TestCase):
                 build_etl_specification_bundle(
                     [visit_specs, self.specs],
                     output_format,
+                    **project,
                 ).content,
             )
 

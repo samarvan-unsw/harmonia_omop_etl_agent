@@ -476,11 +476,13 @@ only the explicitly confirmed generation endpoint may do so.
 - `POST /v1/validate` accepts source-schema and mapping YAML, loads the
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/etl-specification/{output_format}` accepts the same specification
-  request and returns a validated `md`, `docx` or `pdf` document. It includes a
-  shared mapping-grid image, field-level mapping table, source relationships
-  and change log without constructing an AI provider. Word and PDF keep the
-  complete diagram on one portrait page, then use landscape pages for tables.
-  Long tables repeat their header, keep rows intact and include page numbering.
+  request plus a bounded project name and description, then returns a validated
+  `md`, `docx` or `pdf` document. A project cover records the document purpose,
+  scope and included tables. Each table includes a shared mapping-grid image,
+  field-level mapping table, source relationships and change log without
+  constructing an AI provider. Word and PDF keep the complete diagram on one
+  portrait page, then use landscape pages for tables. Long tables repeat their
+  header, keep rows intact and include page numbering.
 - `POST /v1/etl-specification-bundle/{output_format}` accepts two to 50
   mappings with shared source schemas and returns one deterministic document
   containing a clearly separated section for every selected OMOP table. Each

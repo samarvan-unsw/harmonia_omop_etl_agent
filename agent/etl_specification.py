@@ -48,6 +48,14 @@ _MUTED = "536B65"
 _LINE = "DCE5E1"
 _AMBER = "C56F45"
 _MAXIMUM_ROWS = 500
+_DEFAULT_PROJECT_NAME = "OMOP ETL project"
+_PROJECT_PURPOSE = (
+    "This document records the requirements, assumptions, source-to-target "
+    "mappings, business rules and transformations used to convert project "
+    "source data into the OMOP Common Data Model. It is intended as an "
+    "implementation and review reference for data engineers, clinical and "
+    "terminology experts, and researchers."
+)
 
 
 @dataclass(frozen=True)
@@ -284,19 +292,42 @@ def render_markdown(
 
 def render_markdown_collection(
     entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+    *,
+    project_name: str,
+    project_description: str,
 ) -> bytes:
     """Render multiple OMOP table sections in one Markdown document."""
+    versions = sorted({document.cdm_version for document, _ in entries})
+    tables = [document.target_table for document, _ in entries]
     lines = [
-        "# OMOP ETL specification",
+        f"# {_markdown_text(project_name)}",
+        "",
+        "## OMOP ETL specification",
+        "",
+        _markdown_text(
+            project_description
+            or "No project description was provided."
+        ),
+        "",
+        "### Purpose",
+        "",
+        _PROJECT_PURPOSE,
+        "",
+        "### Document scope",
+        "",
+        f"**OMOP CDM version:** {', '.join(versions)}",
+        f"**Included OMOP tables:** {len(tables)}",
         "",
         "**Generation method:** Deterministic; no AI request",
         "",
-        "## Included tables",
+        "### Included tables",
         "",
         *(
             f"- {_markdown_text(document.target_table)}"
             for document, _ in entries
         ),
+        "",
+        "---",
         "",
     ]
     for document, specs in entries:
@@ -1014,11 +1045,54 @@ def _append_docx_specification(
             _set_docx_cell_margins(cell)
 
 
+def _add_docx_cover(
+    document,
+    entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+    *,
+    project_name: str,
+    project_description: str,
+) -> None:
+    """Add a concise portrait project cover before table specifications."""
+    title = document.add_heading(project_name, 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    title.style.font.name = "Arial"
+    title.style.font.color.rgb = RGBColor.from_string(_INK)
+    subtitle = document.add_paragraph()
+    subtitle_run = subtitle.add_run("OMOP ETL specification")
+    subtitle_run.bold = True
+    subtitle_run.font.name = "Arial"
+    subtitle_run.font.size = Pt(18)
+    subtitle_run.font.color.rgb = RGBColor.from_string(_GREEN)
+    document.add_paragraph(
+        project_description or "No project description was provided."
+    )
+
+    _add_docx_heading(document, "Purpose", 1)
+    document.add_paragraph(_PROJECT_PURPOSE)
+    _add_docx_heading(document, "Document scope", 1)
+    versions = sorted({content.cdm_version for content, _ in entries})
+    metadata = document.add_paragraph()
+    metadata.add_run("OMOP CDM version: ").bold = True
+    metadata.add_run(", ".join(versions))
+    metadata = document.add_paragraph()
+    metadata.add_run("Included OMOP tables: ").bold = True
+    metadata.add_run(str(len(entries)))
+    metadata = document.add_paragraph()
+    metadata.add_run("Generation method: ").bold = True
+    metadata.add_run("Deterministic; no AI request")
+    _add_docx_heading(document, "Included tables", 1)
+    for content, _ in entries:
+        document.add_paragraph(content.target_table, style="List Bullet")
+    document.add_page_break()
+
+
 def _render_docx_collection(
     entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
     *,
     document_title: str,
     footer_title: str,
+    project_name: str,
+    project_description: str,
 ) -> bytes:
     """Render one Word file containing one section pair per OMOP table."""
     document = Document()
@@ -1028,6 +1102,13 @@ def _render_docx_collection(
     document.styles["Normal"].font.size = Pt(9.5)
     document.core_properties.title = document_title
     document.core_properties.author = "CardiacAI OMOP Agent"
+    _configure_docx_section(section, WD_ORIENT.PORTRAIT)
+    _add_docx_cover(
+        document,
+        entries,
+        project_name=project_name,
+        project_description=project_description,
+    )
     for index, (content, specs) in enumerate(entries):
         _append_docx_specification(
             document,
@@ -1045,23 +1126,33 @@ def _render_docx_collection(
 def render_docx(
     content: EtlSpecificationDocument,
     specs: ValidatedSpecs,
+    *,
+    project_name: str = _DEFAULT_PROJECT_NAME,
+    project_description: str = "",
 ) -> bytes:
     """Render a mixed-orientation Microsoft Word ETL specification."""
     return _render_docx_collection(
         ((content, specs),),
-        document_title=f"{content.target_table} ETL specification",
+        document_title=f"{project_name} — OMOP ETL specification",
         footer_title=content.target_table,
+        project_name=project_name,
+        project_description=project_description,
     )
 
 
 def render_docx_collection(
     entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+    *,
+    project_name: str,
+    project_description: str,
 ) -> bytes:
     """Render multiple OMOP table specifications in one Word file."""
     return _render_docx_collection(
         entries,
-        document_title="OMOP ETL specification",
+        document_title=f"{project_name} — OMOP ETL specification",
         footer_title="OMOP",
+        project_name=project_name,
+        project_description=project_description,
     )
 
 
@@ -1226,6 +1317,8 @@ def _render_pdf_collection(
     *,
     document_title: str,
     footer_title: str,
+    project_name: str,
+    project_description: str,
 ) -> bytes:
     """Render one mixed-orientation PDF containing all selected tables."""
     buffer = BytesIO()
@@ -1334,7 +1427,31 @@ def _render_pdf_collection(
         ),
     ])
 
-    story = []
+    versions = sorted({content.cdm_version for content, _ in entries})
+    story = [
+        Paragraph(html_escape(project_name), title_style),
+        Paragraph("OMOP ETL specification", heading_style),
+        _pdf_paragraph(
+            project_description or "No project description was provided.",
+            body_style,
+        ),
+        Paragraph("Purpose", heading_style),
+        _pdf_paragraph(_PROJECT_PURPOSE, body_style),
+        Paragraph("Document scope", heading_style),
+        _pdf_paragraph(
+            f"OMOP CDM version: {', '.join(versions)}\n"
+            f"Included OMOP tables: {len(entries)}\n"
+            "Generation method: Deterministic; no AI request",
+            body_style,
+        ),
+        Paragraph("Included tables", heading_style),
+        *(
+            _pdf_paragraph(f"• {content.target_table}", body_style)
+            for content, _ in entries
+        ),
+        NextPageTemplate("portrait"),
+        PageBreak(),
+    ]
     for index, (content, specs) in enumerate(entries):
         story.extend(
             _pdf_specification_story(
@@ -1355,42 +1472,63 @@ def _render_pdf_collection(
 def render_pdf(
     content: EtlSpecificationDocument,
     specs: ValidatedSpecs,
+    *,
+    project_name: str = _DEFAULT_PROJECT_NAME,
+    project_description: str = "",
 ) -> bytes:
     """Render a mixed-orientation A4 PDF ETL specification."""
     return _render_pdf_collection(
         ((content, specs),),
-        document_title=f"{content.target_table} ETL specification",
+        document_title=f"{project_name} — OMOP ETL specification",
         footer_title=content.target_table,
+        project_name=project_name,
+        project_description=project_description,
     )
 
 
 def render_pdf_collection(
     entries: tuple[tuple[EtlSpecificationDocument, ValidatedSpecs], ...],
+    *,
+    project_name: str,
+    project_description: str,
 ) -> bytes:
     """Render multiple OMOP table specifications in one PDF file."""
     return _render_pdf_collection(
         entries,
-        document_title="OMOP ETL specification",
+        document_title=f"{project_name} — OMOP ETL specification",
         footer_title="OMOP",
+        project_name=project_name,
+        project_description=project_description,
     )
 
 
 def build_etl_specification(
     specs: ValidatedSpecs,
     output_format: EtlSpecificationFormat,
+    *,
+    project_name: str = _DEFAULT_PROJECT_NAME,
+    project_description: str = "",
 ) -> EtlSpecificationArtifact:
     """Render one validated mapping as Markdown, Word, or PDF."""
     document = build_etl_specification_document(specs)
+    entries = ((document, specs),)
     renderers = {
-        "md": (render_markdown, "text/markdown; charset=utf-8"),
+        "md": (
+            render_markdown_collection,
+            "text/markdown; charset=utf-8",
+        ),
         "docx": (
-            render_docx,
+            render_docx_collection,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ),
-        "pdf": (render_pdf, "application/pdf"),
+        "pdf": (render_pdf_collection, "application/pdf"),
     }
     renderer, media_type = renderers[output_format]
-    content = renderer(document, specs)
+    content = renderer(
+        entries,
+        project_name=project_name.strip() or _DEFAULT_PROJECT_NAME,
+        project_description=project_description.strip(),
+    )
     if not content:
         raise ValueError("The ETL specification is empty.")
     return EtlSpecificationArtifact(
@@ -1403,6 +1541,9 @@ def build_etl_specification(
 def build_etl_specification_bundle(
     specifications: list[ValidatedSpecs],
     output_format: EtlSpecificationFormat,
+    *,
+    project_name: str = _DEFAULT_PROJECT_NAME,
+    project_description: str = "",
 ) -> EtlSpecificationArtifact:
     """Render multiple validated mappings in one deterministic document."""
     if len(specifications) < 2:
@@ -1429,7 +1570,11 @@ def build_etl_specification_bundle(
         "pdf": (render_pdf_collection, "application/pdf"),
     }
     renderer, media_type = renderers[output_format]
-    content = renderer(entries)
+    content = renderer(
+        entries,
+        project_name=project_name.strip() or _DEFAULT_PROJECT_NAME,
+        project_description=project_description.strip(),
+    )
     if not content:
         raise ValueError("The combined ETL specification is empty.")
 

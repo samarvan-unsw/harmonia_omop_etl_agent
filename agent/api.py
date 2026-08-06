@@ -85,6 +85,21 @@ YamlFileName = Annotated[
         max_length=255,
     ),
 ]
+ProjectName = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=120,
+    ),
+]
+ProjectDescription = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        max_length=1000,
+    ),
+]
 
 
 class StrictApiModel(BaseModel):
@@ -145,6 +160,13 @@ class ValidationRequest(StrictApiModel):
         return self
 
 
+class EtlSpecificationRequest(ValidationRequest):
+    """One validated mapping plus bounded project cover metadata."""
+
+    project_name: ProjectName = "OMOP ETL project"
+    project_description: ProjectDescription | None = None
+
+
 class EtlSpecificationBundleItem(StrictApiModel):
     """One OMOP mapping included in a combined documentation request."""
 
@@ -163,6 +185,8 @@ class EtlSpecificationBundleItem(StrictApiModel):
 class EtlSpecificationBundleRequest(StrictApiModel):
     """Shared source schemas and mappings for one bounded ETL document."""
 
+    project_name: ProjectName = "OMOP ETL project"
+    project_description: ProjectDescription | None = None
     items: list[EtlSpecificationBundleItem] = Field(
         min_length=2,
         max_length=50,
@@ -972,7 +996,7 @@ def validate(request: ValidationRequest) -> ValidationResponse:
 )
 def etl_specification(
     output_format: EtlSpecificationFormat,
-    request: ValidationRequest,
+    request: EtlSpecificationRequest,
 ) -> Response:
     """Download validated ETL documentation without calling AI."""
     try:
@@ -998,7 +1022,12 @@ def etl_specification(
     from .etl_specification import build_etl_specification
 
     try:
-        artifact = build_etl_specification(specs, output_format)
+        artifact = build_etl_specification(
+            specs,
+            output_format,
+            project_name=request.project_name,
+            project_description=request.project_description or "",
+        )
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -1070,6 +1099,8 @@ def etl_specification_bundle(
         artifact = build_etl_specification_bundle(
             specifications,
             output_format,
+            project_name=request.project_name,
+            project_description=request.project_description or "",
         )
     except ValueError as error:
         raise HTTPException(

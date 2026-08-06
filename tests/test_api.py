@@ -513,7 +513,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_downloads_etl_specifications_without_generation(self):
         self.approve_mapping_reviews()
         expected = {
-            "md": ("text/markdown", b"# pe"),
+            "md": ("text/markdown", b"# Ca"),
             "docx": (
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 b"PK\x03\x04",
@@ -531,7 +531,13 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
                 with self.subTest(output_format=output_format):
                     response = await self.client.post(
                         f"/v1/etl-specification/{output_format}",
-                        json=self.payload,
+                        json={
+                            **self.payload,
+                            "project_name": "CardiacAI OMOP",
+                            "project_description": (
+                                "Maps project source data into OMOP CDM."
+                            ),
+                        },
                         headers=self.headers,
                     )
                     self.assertEqual(response.status_code, 200)
@@ -553,16 +559,38 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         ):
             response = await self.client.post(
                 "/v1/etl-specification/md",
-                json=self.payload,
+                json={
+                    **self.payload,
+                    "project_name": "CardiacAI OMOP",
+                },
                 headers=self.headers,
             )
 
         self.assertEqual(response.status_code, 409)
         self.assertIn("race_concept_id", response.json()["detail"])
 
+    async def test_etl_specification_defaults_missing_project_metadata(self):
+        self.approve_mapping_reviews()
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/etl-specification/md",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            response.content.startswith(b"# OMOP ETL project\n")
+        )
+
     async def test_downloads_multiple_etl_specifications_as_one_document(self):
         self.approve_mapping_reviews()
         bundle_payload = {
+            "project_name": "CardiacAI OMOP",
+            "project_description": "Maps project source data into OMOP CDM.",
             "items": [
                 {
                     "omop_table": "person",

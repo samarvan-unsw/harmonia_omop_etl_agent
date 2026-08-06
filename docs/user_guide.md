@@ -422,9 +422,11 @@ python -m agent.cli person --etl-specification docx
 
 Choose `md`, `docx` or `pdf`. The document is written beneath
 `output/etl_specifications/` and includes a mapping diagram, field mapping
-table, source relationships and change log. Every format uses the same complete
-mapping-grid image; Word and PDF put it on a portrait page and use landscape
-pages for the tables. It does not call OpenAI.
+table, source relationships and change log. The document begins with a generic
+project cover when run locally; UI downloads use the stored project name and
+description. Every format uses the same complete mapping-grid image; Word and
+PDF put it on a portrait page and use landscape pages for the tables. It does
+not call OpenAI.
 
 ## 9. Run a dry-run
 
