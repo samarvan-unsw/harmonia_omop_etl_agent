@@ -469,6 +469,10 @@ only the explicitly confirmed generation endpoint may do so.
   no filter returns all 39. It requires API authentication but never
   constructs an AI provider.
 - `GET /v1/ddl/{sql_dialect}` is the backward-compatible SQL-only route.
+- `POST /v1/source-schemas/whiterabbit` accepts a bounded WhiteRabbit `.xlsx`
+  report and deterministically returns one validated source-schema YAML per
+  table plus aggregate profiling metadata. It ignores value-frequency sheets,
+  rejects macros and external links, and never constructs an AI provider.
 - `POST /v1/validate` accepts source-schema and mapping YAML, loads the
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/etl-specification/{output_format}` accepts the same specification
@@ -525,7 +529,17 @@ documented as explicit NULL outputs. Mapping `notes`, field `comment`, joins,
 `union_all`, lookup names and `change_log` entries remain traceable to the
 mapping YAML. This module is deterministic and never imports an AI provider.
 
-## 6C. `agent/preflight.py`
+## 6C. `agent/whiterabbit.py`
+
+Validates and reads OHDSI WhiteRabbit `.xlsx` scan reports, normalizes table
+and field names into safe source-schema identifiers, validates generated YAML
+against `SourceSchemaDocument`, and returns aggregate scan profiles. Archive,
+worksheet, field and output-size limits protect the API from malformed or
+compressed workbooks. The parser never reads or returns per-table
+value-frequency sheets, and statistical candidate keys are not promoted to
+declared primary keys.
+
+## 6D. `agent/preflight.py`
 
 ### Purpose
 
@@ -541,7 +555,7 @@ provider or making an OpenAI request.
 - `configured_output_token_ceiling()` applies the configured per-request
   output limit, generation attempts and API retry count.
 
-## 6D. `agent/costing.py`
+## 6E. `agent/costing.py`
 
 Uses a deterministic three-UTF-8-bytes-per-token estimate before generation,
 then applies the selected model's dated standard-tier pricing. Maximum cost
@@ -1081,6 +1095,7 @@ change local CLI execution.
 | `tests/test_costing.py` | Token estimates, maximum cost and measured usage cost |
 | `tests/test_target_schemas.py` | Full OMOP catalog counts, versions, filenames and foreign keys |
 | `tests/test_source_schema_contract.py` | Source primary/foreign-key metadata contracts |
+| `tests/test_whiterabbit.py` | Safe workbook parsing, YAML conversion and exclusion of raw value sheets |
 
 The suite uses mocked providers and temporary directories, so it does not make
 API calls:

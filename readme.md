@@ -11,6 +11,10 @@ The repository supports two independent entry points:
 
 The agent does not execute SQL or create a dbt project.
 
+It can also convert bounded OHDSI WhiteRabbit `.xlsx` scan reports into
+validated source-schema YAML and aggregate source-profile metadata without an
+OpenAI request. Per-table value-frequency sheets are deliberately ignored.
+
 ## Architecture
 
 ```text

@@ -48,6 +48,11 @@ from .validation import (
     pending_review_fields,
     validate_spec_contents,
 )
+from .whiterabbit import (
+    WhiteRabbitImportResult,
+    WhiteRabbitReportError,
+    parse_whiterabbit_report,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGET_SCHEMA_DIR = ROOT / "specs" / "target_schema"
@@ -55,6 +60,7 @@ CONFIG_PATH = ROOT / "config.yaml"
 MAXIMUM_DOCUMENT_BYTES = 750 * 1024
 MAXIMUM_SPECIFICATION_BYTES = 2 * 1024 * 1024
 MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
+MAXIMUM_WHITERABBIT_BYTES = 3 * 1024 * 1024
 MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
 MAXIMUM_SCHEMA_BUNDLE_BYTES = 4 * 1024 * 1024
@@ -508,6 +514,41 @@ def require_api_token(
 def health() -> dict[str, str]:
     """Expose a non-sensitive liveness endpoint."""
     return {"service": "cardiac-ai-omop-agent", "status": "ok"}
+
+
+@app.post(
+    "/v1/source-schemas/whiterabbit",
+    response_model=WhiteRabbitImportResult,
+    dependencies=[Depends(require_api_token)],
+)
+async def import_whiterabbit_report(request: Request) -> WhiteRabbitImportResult:
+    """Convert a bounded WhiteRabbit .xlsx report without invoking AI."""
+    content_type = request.headers.get("content-type", "").partition(";")[0]
+    if content_type != (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Upload an .xlsx WhiteRabbit report.",
+        )
+    content = await request.body()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="The WhiteRabbit report is empty.",
+        )
+    if len(content) > MAXIMUM_WHITERABBIT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="The WhiteRabbit report exceeds the 3 MB import limit.",
+        )
+    try:
+        return parse_whiterabbit_report(content)
+    except WhiteRabbitReportError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
 
 
 @app.get(

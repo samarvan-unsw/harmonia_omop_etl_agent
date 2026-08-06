@@ -9,6 +9,13 @@ import yaml
 from httpx import ASGITransport, AsyncClient
 
 from agent.api import app
+from agent.whiterabbit import (
+    WhiteRabbitFieldProfile,
+    WhiteRabbitGeneratedSchema,
+    WhiteRabbitImportResult,
+    WhiteRabbitTableProfile,
+)
+from tests.test_whiterabbit import build_scan_report
 
 
 class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
@@ -104,6 +111,136 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             {"AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get("/v1/target-schemas")
+
+        self.assertEqual(response.status_code, 401)
+
+    async def test_converts_whiterabbit_report_without_generation(self):
+        imported = WhiteRabbitImportResult(
+            report_version="1.0.0",
+            table_count=1,
+            field_count=1,
+            renamed_table_count=0,
+            renamed_field_count=0,
+            tables=[
+                WhiteRabbitGeneratedSchema(
+                    file_name="patient.yml",
+                    content=(
+                        "version: 2\nmodels:\n- name: patient\n"
+                        "  columns:\n  - name: patient_id\n"
+                    ),
+                    source_table_name="PATIENT",
+                    model_name="patient",
+                    field_count=1,
+                    candidate_key_fields=["patient_id"],
+                    profile=WhiteRabbitTableProfile(
+                        model_name="patient",
+                        source_table_name="PATIENT",
+                        field_count=1,
+                        fields=[
+                            WhiteRabbitFieldProfile(
+                                name="patient_id",
+                                source_field_name="PATIENT_ID",
+                                raw_data_type="NUMBER",
+                                row_count=1,
+                                rows_checked=1,
+                                fraction_empty=0,
+                                unique_values=1,
+                                fraction_unique=1,
+                                candidate_key=True,
+                            )
+                        ],
+                    ),
+                )
+            ],
+            warnings=[],
+        )
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch(
+                "agent.api.parse_whiterabbit_report",
+                return_value=imported,
+            ) as parse_report,
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/source-schemas/whiterabbit",
+                content=b"xlsx fixture",
+                headers={
+                    **self.headers,
+                    "Content-Type": (
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["tables"][0]["model_name"], "patient")
+        parse_report.assert_called_once_with(b"xlsx fixture")
+        run_agent.assert_not_called()
+
+    async def test_whiterabbit_import_rejects_wrong_media_type(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/source-schemas/whiterabbit",
+                content=b"xlsx fixture",
+                headers={**self.headers, "Content-Type": "application/json"},
+            )
+
+        self.assertEqual(response.status_code, 415)
+
+    async def test_imports_whiterabbit_report_without_ai(self):
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/source-schemas/whiterabbit",
+                content=build_scan_report(),
+                headers={
+                    **self.headers,
+                    "Content-Type": (
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertEqual(result["table_count"], 1)
+        self.assertEqual(result["tables"][0]["file_name"], "clinical_patient.yml")
+        self.assertEqual(
+            result["tables"][0]["profile"]["fields"][0]["unique_values"],
+            10,
+        )
+        self.assertNotIn("SECRET-PATIENT-VALUE", response.text)
+        run_agent.assert_not_called()
+
+    async def test_whiterabbit_import_requires_bearer_token(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/source-schemas/whiterabbit",
+                content=build_scan_report(),
+                headers={
+                    "Content-Type": (
+                        "application/vnd.openxmlformats-officedocument."
+                        "spreadsheetml.sheet"
+                    ),
+                },
+            )
 
         self.assertEqual(response.status_code, 401)
 

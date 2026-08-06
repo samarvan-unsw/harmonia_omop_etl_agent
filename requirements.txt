@@ -7,6 +7,9 @@ lxml==6.1.1
 # Calls OpenAI models through the Responses API.
 openai==2.47.0
 
+# Reads OHDSI WhiteRabbit .xlsx scan reports for deterministic schema import.
+openpyxl==3.1.5
+
 # Renders deterministic mapping diagrams embedded in ETL specifications.
 Pillow==12.3.0
 
