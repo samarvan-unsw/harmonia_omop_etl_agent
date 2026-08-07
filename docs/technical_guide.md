@@ -1,4 +1,4 @@
-# CardiacAI OMOP Agent Technical Guide
+# Harmonia OMOP Agent Technical Guide
 
 ## 1. Purpose and architecture
 

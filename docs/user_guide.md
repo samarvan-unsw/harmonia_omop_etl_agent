@@ -1,4 +1,4 @@
-# CardiacAI OMOP Agent User Guide
+# Harmonia OMOP Agent User Guide
 
 ## 1. What the agent does
 
@@ -193,7 +193,7 @@ Declare known source relationships on the foreign-key column:
 ```
 
 Foreign keys are optional metadata, but declaring them allows clients such as
-the CardiacAI OMOP Studio source explorer to show trustworthy table
+the Harmonia OMOP Studio source explorer to show trustworthy table
 connections. Do not infer or declare a relationship from similar field names
 alone.
 

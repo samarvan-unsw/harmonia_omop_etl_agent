@@ -98,7 +98,7 @@ class EtlSpecificationTest(unittest.TestCase):
 
     def test_renders_markdown_word_and_pdf_without_ai(self):
         project = {
-            "project_name": "CardiacAI OMOP",
+            "project_name": "Harmonia OMOP",
             "project_description": "Maps project source data into OMOP CDM.",
         }
         markdown = build_etl_specification(self.specs, "md", **project)
@@ -107,7 +107,7 @@ class EtlSpecificationTest(unittest.TestCase):
 
         self.assertEqual(markdown.file_name, "person_etl_specification.md")
         markdown_text = markdown.content.decode("utf-8")
-        self.assertTrue(markdown_text.startswith("# CardiacAI OMOP\n"))
+        self.assertTrue(markdown_text.startswith("# Harmonia OMOP\n"))
         self.assertIn(_PROJECT_PURPOSE, markdown_text)
         self.assertNotIn("```mermaid", markdown_text)
         image_match = re.search(
@@ -129,7 +129,7 @@ class EtlSpecificationTest(unittest.TestCase):
         word_document = Document(BytesIO(word.content))
         self.assertEqual(
             word_document.paragraphs[0].text,
-            "CardiacAI OMOP",
+            "Harmonia OMOP",
         )
         self.assertIn(
             "person ETL specification",
@@ -201,7 +201,7 @@ class EtlSpecificationTest(unittest.TestCase):
         )
 
         project = {
-            "project_name": "CardiacAI OMOP",
+            "project_name": "Harmonia OMOP",
             "project_description": "Maps project source data into OMOP CDM.",
         }
         markdown = build_etl_specification_bundle(
@@ -220,7 +220,7 @@ class EtlSpecificationTest(unittest.TestCase):
         )
         self.assertEqual(markdown.file_name, "omop_etl_specification.md")
         markdown_text = markdown.content.decode("utf-8")
-        self.assertTrue(markdown_text.startswith("# CardiacAI OMOP\n"))
+        self.assertTrue(markdown_text.startswith("# Harmonia OMOP\n"))
         self.assertEqual(markdown_text.count("## OMOP ETL specification"), 1)
         self.assertIn("## person ETL specification", markdown_text)
         self.assertIn("## visit_occurrence ETL specification", markdown_text)

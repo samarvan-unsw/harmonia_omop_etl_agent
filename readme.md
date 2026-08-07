@@ -1,4 +1,4 @@
-# CardiacAI OMOP SQL Agent
+# Harmonia OMOP Agent
 
 A bounded Python agent that converts validated source-schema and
 source-to-OMOP mapping specifications into validated transformation SQL and
@@ -7,7 +7,7 @@ deterministic schema artifacts for OMOP CDM 5.4.
 The repository supports two independent entry points:
 
 - Local CLI operation for development in VS Code.
-- An authenticated HTTP API used by the separate CardiacAI OMOP Agent UI.
+- An authenticated HTTP API used by the separate Harmonia OMOP Studio UI.
 
 The agent does not execute SQL or create a dbt project.
 

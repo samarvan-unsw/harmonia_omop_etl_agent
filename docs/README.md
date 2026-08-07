@@ -9,4 +9,4 @@
 - [Vercel deployment](vercel_deployment.md): deploy the authenticated agent
   API.
 - [Development roadmap](development_plan.md): optional future improvements.
-- `cardiacai_omop_architecture.drawio`: editable architecture diagram.
+- `harmonia_omop_architecture.drawio`: editable architecture diagram.

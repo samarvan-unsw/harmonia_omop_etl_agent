@@ -513,7 +513,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_downloads_etl_specifications_without_generation(self):
         self.approve_mapping_reviews()
         expected = {
-            "md": ("text/markdown", b"# Ca"),
+            "md": ("text/markdown", b"# Ha"),
             "docx": (
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 b"PK\x03\x04",
@@ -533,7 +533,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
                         f"/v1/etl-specification/{output_format}",
                         json={
                             **self.payload,
-                            "project_name": "CardiacAI OMOP",
+                            "project_name": "Harmonia OMOP",
                             "project_description": (
                                 "Maps project source data into OMOP CDM."
                             ),
@@ -561,7 +561,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
                 "/v1/etl-specification/md",
                 json={
                     **self.payload,
-                    "project_name": "CardiacAI OMOP",
+                    "project_name": "Harmonia OMOP",
                 },
                 headers=self.headers,
             )
@@ -589,7 +589,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_downloads_multiple_etl_specifications_as_one_document(self):
         self.approve_mapping_reviews()
         bundle_payload = {
-            "project_name": "CardiacAI OMOP",
+            "project_name": "Harmonia OMOP",
             "project_description": "Maps project source data into OMOP CDM.",
             "items": [
                 {

@@ -1101,7 +1101,7 @@ def _render_docx_collection(
     document.styles["Normal"].font.name = "Arial"
     document.styles["Normal"].font.size = Pt(9.5)
     document.core_properties.title = document_title
-    document.core_properties.author = "CardiacAI OMOP Agent"
+    document.core_properties.author = "Harmonia OMOP Agent"
     _configure_docx_section(section, WD_ORIENT.PORTRAIT)
     _add_docx_cover(
         document,
@@ -1331,7 +1331,7 @@ def _render_pdf_collection(
         bottomMargin=10 * mm,
         invariant=1,
         title=document_title,
-        author="CardiacAI OMOP Agent",
+        author="Harmonia OMOP Agent",
     )
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(

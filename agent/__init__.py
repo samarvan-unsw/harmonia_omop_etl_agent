@@ -1,1 +1,1 @@
-"""CardiacAI OMOP SQL generation agent."""
+"""Harmonia OMOP SQL generation agent."""

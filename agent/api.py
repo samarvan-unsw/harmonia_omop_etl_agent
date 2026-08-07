@@ -457,7 +457,7 @@ class GenerationResponse(StrictApiModel):
 
 
 app = FastAPI(
-    title="CardiacAI OMOP Agent API",
+    title="Harmonia OMOP Agent API",
     version="1.0.0",
     docs_url="/docs",
     redoc_url=None,
