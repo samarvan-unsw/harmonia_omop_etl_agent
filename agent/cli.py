@@ -26,12 +26,14 @@ from .preflight import (
     generation_readiness_blockers,
 )
 from .provider_errors import api_error_message
+from .providers import ProviderConfigurationError
 from .providers.base import TokenUsage
 from .validation import (
     SpecValidationError,
     pending_review_fields,
     validate_specs,
 )
+from .yaml_loader import load_yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -186,7 +188,7 @@ def main():
 
     load_dotenv(ROOT / ".env")
     try:
-        raw_config = yaml.safe_load(
+        raw_config = load_yaml(
             (ROOT / "config.yaml").read_text(encoding="utf-8")
         )
         if not isinstance(raw_config, dict):
@@ -334,10 +336,10 @@ def main():
             config,
             max_iterations=args.max_iterations,
         )
-    except KeyError as exc:
+    except ProviderConfigurationError as exc:
         parser.exit(
             1,
-            f"Configuration error: missing environment variable {exc.args[0]}.\n",
+            f"Configuration error: {exc}\n",
         )
     except OpenAIError as exc:
         parser.exit(1, f"API error: {_api_error_message(exc)}\n")

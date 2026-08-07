@@ -193,8 +193,8 @@ class SourceColumn(StrictModel):
     """A source column available for OMOP mapping."""
 
     name: SqlIdentifier
-    data_type: str | None = None
-    description: str = ""
+    data_type: str | None = Field(default=None, max_length=255)
+    description: str = Field(default="", max_length=10_000)
     primary_key: bool = False
     foreign_key: SourceForeignKey | None = None
 
@@ -203,15 +203,34 @@ class SourceModel(StrictModel):
     """A source table or dbt model."""
 
     name: SqlIdentifier
-    description: str = ""
-    columns: list[SourceColumn] = Field(default_factory=list)
+    description: str = Field(default="", max_length=10_000)
+    columns: list[SourceColumn] = Field(
+        default_factory=list,
+        max_length=10_000,
+    )
+
+    @model_validator(mode="after")
+    def validate_columns(self) -> "SourceModel":
+        """Reject ambiguous duplicate column declarations."""
+        column_names = [column.name for column in self.columns]
+        if len(column_names) != len(set(column_names)):
+            raise ValueError("source columns must be unique within a model")
+        return self
 
 
 class SourceSchemaDocument(StrictModel):
     """Root structure of a source-schema YAML file."""
 
-    version: int
-    models: list[SourceModel]
+    version: Literal[2]
+    models: list[SourceModel] = Field(min_length=1, max_length=10_000)
+
+    @model_validator(mode="after")
+    def validate_models(self) -> "SourceSchemaDocument":
+        """Reject ambiguous duplicate model declarations."""
+        model_names = [model.name for model in self.models]
+        if len(model_names) != len(set(model_names)):
+            raise ValueError("source models must be unique")
+        return self
 
 
 # =============================================================================

@@ -110,6 +110,16 @@ Run the complete network-free test suite:
 python -m unittest discover -s tests -v
 ```
 
+Development quality checks use the separately pinned tooling dependency:
+
+```bash
+pip install -r requirements-dev.txt
+ruff check agent scripts tests
+```
+
+`.github/workflows/ci.yml` runs the same lint and network-free tests for pull
+requests and pushes to `main`.
+
 ## Specifications
 
 Each requested OMOP table uses:
@@ -128,6 +138,8 @@ Important mapping rules:
 
 - Missing optional OMOP fields become typed NULL expressions.
 - Missing required OMOP fields fail validation.
+- Duplicate YAML keys, excessive aliases and unsupported source-schema
+  versions fail validation.
 - Users may explicitly assign a required field `action: "null"`.
 - Unknown source models, source fields and OMOP target fields fail validation.
 - Pending mapping reviews block generation.
@@ -169,6 +181,9 @@ Versioned endpoints:
 
 The API token and OpenAI key remain server-side. API generation returns a
 bounded output bundle without overwriting locally managed output files.
+Request limits apply to bytes actually received, including requests without a
+declared content length. Responses include an opaque request identifier for
+operational tracing without logging request bodies.
 The schema-bundle endpoint returns either the four deterministic OMOP DDL
 files for `sql` output or one dbt model-contract YAML per OMOP table for `dbt`
 output. Repeated `tables` query parameters can limit dbt output to selected

@@ -2,8 +2,9 @@
 
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 # Generated SQL files are written directly into this directory.
@@ -104,23 +105,9 @@ def discard_candidate(path: str, candidate_id: str | None = None) -> None:
     candidate.unlink(missing_ok=True)
 
 
-# Tool definitions supplied to the model.
+# The model only needs to write a candidate. Reading generated files remains an
+# internal validator operation so previous output cannot be exposed to prompts.
 TOOL_SCHEMAS = [
-    {
-        "name": "read_file",
-        "description": "Read a generated SQL file from the output directory.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "pattern": r"^[A-Za-z_][A-Za-z0-9_]*\.sql$",
-                }
-            },
-            "required": ["path"],
-            "additionalProperties": False,
-        },
-    },
     {
         "name": "write_file",
         "description": "Write a generated SQL file into the output directory.",
@@ -146,7 +133,6 @@ TOOL_SCHEMAS = [
 def dispatch(tool_call: Any, candidate_id: str | None = None) -> str:
     """Dispatch a provider tool call to an approved file operation."""
     handlers: dict[str, Callable[..., str]] = {
-        "read_file": read_file,
         "write_file": write_file,
     }
 

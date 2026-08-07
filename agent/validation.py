@@ -14,6 +14,7 @@ from .contracts import (
     SourceSchemaDocument,
     TargetSchemaDocument,
 )
+from .yaml_loader import load_yaml
 
 
 class SpecValidationError(ValueError):
@@ -47,7 +48,7 @@ def _load_yaml(path: Path) -> Any:
         raise SpecValidationError(f"Specification file not found: {path}")
 
     try:
-        return yaml.safe_load(path.read_text(encoding="utf-8"))
+        return load_yaml(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         raise SpecValidationError(f"Invalid YAML in {path}: {exc}") from exc
 
@@ -55,7 +56,7 @@ def _load_yaml(path: Path) -> Any:
 def _load_yaml_text(content: str, label: str) -> Any:
     """Parse one in-memory YAML document for API-backed validation."""
     try:
-        return yaml.safe_load(content)
+        return load_yaml(content)
     except (RecursionError, yaml.YAMLError) as exc:
         raise SpecValidationError(f"Invalid YAML in {label}: {exc}") from exc
 

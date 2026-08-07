@@ -82,7 +82,18 @@ python -m agent.cli person --dry-run
 python -m unittest discover -s tests -v
 ```
 
+Install and run the development-only Python quality gate separately from the
+runtime image:
+
+```bash
+pip install -r requirements-dev.txt
+ruff check agent scripts tests
+```
+
 All tests use mocks or temporary directories and do not contact OpenAI.
+`.github/workflows/ci.yml` installs the pinned runtime and development
+dependencies, then runs Ruff and the network-free suite on pull requests and
+pushes to `main`.
 
 ### Local API
 
@@ -145,8 +156,10 @@ The practical sequence is:
 | --- | --- | --- |
 | `agent.cli` | User entry point, preflight, cost guard and logging | User |
 | `agent.contracts` | Pydantic contracts for configuration and YAML | Validation and CLI |
+| `agent.yaml_loader` | Safe YAML parsing with duplicate-key and alias limits | Validation, API, CLI and artifacts |
 | `agent.validation` | File and in-memory cross-specification validation | CLI, API, context and loop |
 | `agent.api` | Authenticated HTTP validation and preflight interface | UI or another server |
+| `agent.http_middleware` | Streamed request-size enforcement and request tracing | HTTP API |
 | `agent.etl_specification` | Deterministic Markdown, Word and PDF ETL documentation | API and CLI |
 | `agent.preflight` | Shared readiness, prompt-size and token-ceiling calculation | CLI and API |
 | `agent.costing` | Token-length and model-price cost estimates | Preflight, CLI and API |
@@ -306,11 +319,16 @@ Represents one source field:
 
 #### `SourceModel`
 
-Represents one source table or dbt model and its columns.
+Represents one source table or dbt model and its columns. Column names must be
+unique within the model.
 
 #### `SourceSchemaDocument`
 
-Represents the root of one source-schema YAML file.
+Represents the root of one source-schema YAML file. It requires contract
+`version: 2`, at least one model and unique model names. All specification
+entry points use `agent.yaml_loader`, which retains PyYAML's safe-tag
+restrictions and additionally rejects duplicate mapping keys and excessive
+alias expansion before Pydantic validation.
 
 ### Mapping contracts
 
@@ -496,10 +514,16 @@ only the explicitly confirmed generation endpoint may do so.
   transcript or overwrite the CLI output file.
 
 Validation requests require a bearer token matching `AGENT_API_TOKEN`.
-Request documents and total request content have bounded sizes. Error
-responses omit submitted values. API generation is limited to one concurrent
+Request documents and total request content have bounded sizes. The HTTP
+boundary checks both declared content length and bytes actually received, so
+chunked requests cannot bypass the limit. Error responses omit submitted
+values. API generation is limited to one concurrent
 request per server process and a maximum configured ceiling of 20,000 output
-tokens.
+tokens. Every response includes an opaque `X-Request-ID`; request logs contain
+that identifier, method, path, status and duration but never request bodies or
+credentials. Deployment-owned configuration and target-schema assets are
+validated once and cached per process; changing either requires a process
+restart or redeployment.
 
 ### Project-scoped generation settings
 
@@ -830,7 +854,8 @@ expressions. Nested paths and traversal are rejected.
 #### `read_file(path, candidate_id=None)`
 
 Reads the run-specific candidate when present; otherwise reads the promoted
-file.
+file. This helper is used only by deterministic internal validation and is not
+exposed to the model.
 
 #### `write_file(path, content, candidate_id=None)`
 
@@ -852,8 +877,8 @@ Removes an unpromoted candidate while preserving the previous valid output.
 
 #### `dispatch(tool_call, candidate_id=None)`
 
-Routes only `read_file` and `write_file`. Unknown tools, invalid arguments and
-safe filesystem errors are returned as tool messages.
+Routes only `write_file`. Unknown tools, invalid arguments and safe filesystem
+errors are returned as tool messages.
 
 #### `_resolve_sql_file()` and `_resolve_candidate_file()`
 
@@ -861,8 +886,9 @@ Enforce the output boundary and safe filename formats.
 
 ### `TOOL_SCHEMAS`
 
-Defines the strict JSON schemas sent to the model for `read_file` and
-`write_file`.
+Defines the strict JSON schema sent to the model for `write_file`. Keeping
+`read_file` outside this list prevents a prompt-injection attempt from reading
+previously promoted SQL and sending it to a provider.
 
 ## 13A. `agent/output_artifacts.py`
 

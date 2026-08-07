@@ -1,0 +1,2 @@
+# Fast Python linter used by local and CI quality gates.
+ruff==0.15.22

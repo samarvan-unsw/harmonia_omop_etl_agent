@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from .contracts import TargetField, TargetSchemaDocument
 from .dialects import SUPPORTED_SQL_DIALECTS, platform_data_type
+from .yaml_loader import load_yaml
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -84,7 +85,7 @@ def _load_target_schemas(
     schemas: list[TargetSchemaDocument] = []
     for path in sorted(target_schema_dir.glob("*.yml")):
         try:
-            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            data = load_yaml(path.read_text(encoding="utf-8"))
             schemas.append(TargetSchemaDocument.model_validate(data))
         except (OSError, ValidationError, yaml.YAMLError) as error:
             raise ValueError(

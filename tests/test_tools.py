@@ -4,9 +4,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from agent.providers.base import ToolCall
 from agent.tools import (
+    TOOL_SCHEMAS,
     _configured_output_dir,
     discard_candidate,
+    dispatch,
     promote_file,
     read_file,
     write_file,
@@ -104,6 +107,25 @@ class OutputToolSafetyTest(unittest.TestCase):
             self.assertRaisesRegex(ValueError, "too broad"),
         ):
             _configured_output_dir()
+
+    def test_exposes_only_candidate_writes_to_the_model(self):
+        """Generated or promoted SQL must not be readable through model tools."""
+        self.assertEqual(
+            [schema["name"] for schema in TOOL_SCHEMAS],
+            ["write_file"],
+        )
+
+    def test_dispatch_rejects_model_read_attempts(self):
+        """A fabricated read tool call must fail closed."""
+        result = dispatch(
+            ToolCall(
+                id="call-1",
+                name="read_file",
+                arguments={"path": "person.sql"},
+            )
+        )
+
+        self.assertEqual(result, "ERROR: unknown tool: read_file")
 
 
 if __name__ == "__main__":

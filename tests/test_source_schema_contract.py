@@ -57,6 +57,44 @@ class SourceSchemaContractTest(unittest.TestCase):
                 }
             )
 
+    def test_rejects_unsupported_contract_version(self):
+        """Only the documented source-schema contract version is accepted."""
+        with self.assertRaises(ValidationError):
+            SourceSchemaDocument.model_validate(
+                {"version": 1, "models": [{"name": "patient"}]}
+            )
+
+    def test_rejects_duplicate_models(self):
+        """A document cannot silently redefine a source model."""
+        with self.assertRaisesRegex(ValidationError, "must be unique"):
+            SourceSchemaDocument.model_validate(
+                {
+                    "version": 2,
+                    "models": [
+                        {"name": "patient"},
+                        {"name": "patient"},
+                    ],
+                }
+            )
+
+    def test_rejects_duplicate_columns(self):
+        """A model cannot silently redefine a source field."""
+        with self.assertRaisesRegex(ValidationError, "must be unique"):
+            SourceSchemaDocument.model_validate(
+                {
+                    "version": 2,
+                    "models": [
+                        {
+                            "name": "patient",
+                            "columns": [
+                                {"name": "patient_id"},
+                                {"name": "patient_id"},
+                            ],
+                        }
+                    ],
+                }
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

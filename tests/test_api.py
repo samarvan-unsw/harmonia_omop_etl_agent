@@ -104,6 +104,14 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+        self.assertRegex(
+            response.headers["X-Request-ID"],
+            r"^[a-f0-9]{32}$",
+        )
+        self.assertEqual(
+            response.headers["X-Content-Type-Options"],
+            "nosniff",
+        )
 
     async def test_target_catalog_requires_bearer_token(self):
         with patch.dict(

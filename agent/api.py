@@ -1,9 +1,11 @@
 """Expose agent validation, preflight, generation, and schema endpoints via FastAPI."""
 
 import hmac
+import logging
 import os
-from io import BytesIO
 from datetime import date
+from functools import lru_cache
+from io import BytesIO
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Annotated, Literal
@@ -35,6 +37,7 @@ from pydantic import (
 from .contracts import AgentConfig, TargetSchemaDocument
 from .costing import estimated_usage_cost_usd
 from .dialects import SqlDialect
+from .http_middleware import RequestPolicyMiddleware
 from .loop import run_agent_with_specs
 from .output_artifacts import build_schema_artifacts
 from .preflight import (
@@ -42,6 +45,7 @@ from .preflight import (
     generation_readiness_blockers,
 )
 from .provider_errors import api_error_message
+from .providers import ProviderConfigurationError
 from .validation import (
     SpecValidationError,
     ValidatedSpecs,
@@ -53,6 +57,10 @@ from .whiterabbit import (
     WhiteRabbitReportError,
     parse_whiterabbit_report,
 )
+from .yaml_loader import load_yaml
+
+
+LOGGER = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGET_SCHEMA_DIR = ROOT / "specs" / "target_schema"
@@ -462,25 +470,11 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url=None,
 )
-
-
-@app.middleware("http")
-async def reject_oversized_requests(request: Request, call_next):
-    """Reject declared oversized bodies before JSON parsing."""
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            if int(content_length) > MAXIMUM_REQUEST_BYTES:
-                return JSONResponse(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    content={"detail": "Request body is too large."},
-                )
-        except ValueError:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"detail": "Invalid Content-Length header."},
-            )
-    return await call_next(request)
+app.add_middleware(
+    RequestPolicyMiddleware,
+    maximum_request_bytes=MAXIMUM_REQUEST_BYTES,
+    logger=LOGGER,
+)
 
 
 @app.exception_handler(RequestValidationError)
@@ -731,10 +725,17 @@ def ddl_bundle(sql_dialect: SqlDialect) -> Response:
     )
 
 
+@lru_cache(maxsize=128)
+def _read_target_schema_content(path: Path) -> str:
+    """Read one immutable, deployment-owned target-schema asset."""
+    return path.read_text(encoding="utf-8")
+
+
+@lru_cache(maxsize=128)
 def _read_target_schema(path: Path) -> TargetSchemaDocument:
     """Load and validate one agent-owned target file."""
     try:
-        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        document = load_yaml(_read_target_schema_content(path))
         target_schema = TargetSchemaDocument.model_validate(document)
     except (OSError, ValidationError, yaml.YAMLError) as error:
         raise RuntimeError("Target schema catalog is unavailable.") from error
@@ -841,8 +842,8 @@ def _validate_request_specifications(
         TARGET_SCHEMA_DIR / f"{request.omop_table}.yml"
     )
     try:
-        target_schema_content = target_schema_path.read_text(
-            encoding="utf-8"
+        target_schema_content = _read_target_schema_content(
+            target_schema_path
         )
     except OSError as error:
         raise SpecValidationError(
@@ -862,17 +863,21 @@ def _validate_request_specifications(
     )
 
 
+@lru_cache(maxsize=1)
+def _load_base_agent_config() -> AgentConfig:
+    """Load immutable deployment configuration once per process."""
+    raw_config = load_yaml(CONFIG_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw_config, dict):
+        raise ValueError("config.yaml must contain a mapping")
+    return AgentConfig.model_validate(raw_config)
+
+
 def _load_agent_config(
     generation_settings: ProjectGenerationSettings | None = None,
 ) -> dict:
-    """Load agent defaults and apply only validated project choices."""
+    """Copy agent defaults and apply only validated project choices."""
     try:
-        raw_config = yaml.safe_load(
-            CONFIG_PATH.read_text(encoding="utf-8")
-        )
-        if not isinstance(raw_config, dict):
-            raise ValueError("config.yaml must contain a mapping")
-        config = AgentConfig.model_validate(raw_config).model_dump()
+        config = _load_base_agent_config().model_dump()
     except (
         OSError,
         ValueError,
@@ -1331,7 +1336,7 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             max_iterations=request.max_iterations,
             promote_output=False,
         )
-    except KeyError:
+    except ProviderConfigurationError:
         return GenerationResponse(
             status="failed",
             completed=False,
