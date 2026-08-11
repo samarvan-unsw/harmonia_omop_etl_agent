@@ -56,7 +56,7 @@ requirements.txt
 ## Requirements
 
 - Python 3.12.12, recorded in `.python-version`.
-- An OpenAI API key only for SQL generation.
+- An OpenAI or Anthropic API key only for SQL generation.
 - No database or dbt installation is required.
 
 ## Local setup
@@ -69,8 +69,9 @@ python -m pip install --requirement requirements.txt
 cp .env.example .env
 ```
 
-Set `OPENAI_API_KEY` in `.env` only when generation is required. Never commit
-the `.env` file.
+For local CLI generation, set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` to match
+the provider selected in `config.yaml`. Never commit the `.env` file. Hosted
+Claude generation can instead receive a transient per-run key from the UI.
 
 ## Common commands
 

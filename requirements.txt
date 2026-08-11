@@ -1,6 +1,9 @@
 # Exposes the agent's validation and generation workflows as an HTTP API.
 fastapi==0.139.2
 
+# Calls Claude models through Anthropic's Messages API.
+anthropic==0.117.0
+
 # Provides the pinned XML engine used by Microsoft Word document generation.
 lxml==6.1.1
 

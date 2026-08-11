@@ -68,9 +68,10 @@ it statically without connecting to a warehouse.
 `.env` contains secrets:
 
 - `OPENAI_API_KEY` for paid generation.
+- `ANTHROPIC_API_KEY` for optional local Claude generation.
 - `AGENT_API_TOKEN` when the HTTP API is enabled.
 
-Validation and preflight do not require an OpenAI key.
+Validation and preflight do not require a provider key.
 
 ### Verification
 
@@ -759,22 +760,26 @@ A future provider must implement this contract.
 
 Provides the provider factory.
 
-#### `load_provider(config)`
+#### `load_provider(config, api_key=None)`
 
-Currently constructs `CodexProvider` using:
+Constructs the selected OpenAI or Anthropic adapter using:
 
 - Configured model.
-- `OPENAI_API_KEY`.
+- An explicitly supplied transient key, or the matching local environment key.
 - Per-request output limit.
 - SDK retry limit.
 
-The configuration contract currently permits only `provider: codex`.
+The transient key is held only for the current run and is never added to
+configuration, transcripts or API response data.
 
 ## 12. `agent/providers/codex_provider.py`
 
 ### Purpose
 
 Adapts the provider-neutral contract to the OpenAI Responses API.
+
+`agent/providers/anthropic_provider.py` implements the same contract for the
+Anthropic Messages API, including canonical tool-call and usage conversion.
 
 ### State
 
@@ -1059,12 +1064,13 @@ runs generate the same OMOP table concurrently, the last promotion wins.
 Controls provider defaults, project model allowlist, hard limits, dated
 standard-tier pricing, source-reference style, output format and SQL dialect.
 HTTP clients may apply only bounded project choices listed in the API section
-and only for the current request.
+and only for the current request. Models are explicitly mapped to providers.
 
 ### `.env`
 
-Stores `OPENAI_API_KEY` and the optional `AGENT_API_TOKEN`. It is loaded only
-at runtime and is gitignored.
+Stores local CLI provider keys and the optional `AGENT_API_TOKEN`. It is loaded
+only at runtime and is gitignored. UI-supplied Claude keys are not written to
+this file.
 
 ### `specs/source_schema/`
 

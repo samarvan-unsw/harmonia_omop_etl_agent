@@ -11,9 +11,6 @@ from tempfile import NamedTemporaryFile
 
 import yaml
 from dotenv import load_dotenv
-from openai import (
-    OpenAIError,
-)
 from pydantic import ValidationError
 
 from .contracts import AgentConfig
@@ -25,7 +22,7 @@ from .preflight import (
     configured_output_token_ceiling,
     generation_readiness_blockers,
 )
-from .provider_errors import api_error_message
+from .provider_errors import PROVIDER_API_ERRORS, api_error_message
 from .providers import ProviderConfigurationError
 from .providers.base import TokenUsage
 from .validation import (
@@ -38,7 +35,7 @@ from .yaml_loader import load_yaml
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _api_error_message(error: OpenAIError) -> str:
+def _api_error_message(error: Exception) -> str:
     """Backward-compatible wrapper around shared safe error formatting."""
     return api_error_message(error)
 
@@ -341,7 +338,7 @@ def main():
             1,
             f"Configuration error: {exc}\n",
         )
-    except OpenAIError as exc:
+    except PROVIDER_API_ERRORS as exc:
         parser.exit(1, f"API error: {_api_error_message(exc)}\n")
 
     logs_dir = ROOT / "logs"

@@ -15,6 +15,9 @@ from pydantic import (
 from .dialects import SqlDialect
 
 
+ProviderName = Literal["codex", "anthropic"]
+
+
 # =============================================================================
 # SHARED CONTRACT BASE
 # =============================================================================
@@ -61,6 +64,7 @@ class ProjectLimitsConfig(StrictModel):
     """Server-owned bounds for user-selectable generation settings."""
 
     allowed_models: list[str] = Field(min_length=1)
+    model_providers: dict[str, ProviderName] = Field(min_length=1)
     maximum_output_tokens_per_request: int = Field(ge=100, le=20_000)
     maximum_initial_prompt_characters: int = Field(
         ge=1_000,
@@ -80,6 +84,26 @@ class ProjectLimitsConfig(StrictModel):
         ):
             raise ValueError("allowed_models must be unique non-empty values")
         return normalized
+
+    @field_validator("model_providers")
+    @classmethod
+    def validate_model_provider_names(
+        cls,
+        value: dict[str, ProviderName],
+    ) -> dict[str, ProviderName]:
+        """Reject malformed model identifiers in the provider registry."""
+        if any(
+            not model
+            or len(model) > 100
+            or not model[0].isalnum()
+            or any(
+                not (character.isalnum() or character in "._-")
+                for character in model
+            )
+            for model in value
+        ):
+            raise ValueError("model_providers contains invalid model names")
+        return value
 
 
 class ModelPricingConfig(StrictModel):
@@ -125,7 +149,7 @@ class PricingConfig(StrictModel):
 class AgentConfig(StrictModel):
     """Root structure of config.yaml."""
 
-    provider: Literal["codex"]
+    provider: ProviderName
     model: str = Field(min_length=1)
     max_output_tokens: int = Field(gt=0)
     max_initial_prompt_characters: int = Field(gt=0)
@@ -148,11 +172,22 @@ class AgentConfig(StrictModel):
         if self.model not in self.project_limits.allowed_models:
             raise ValueError("model must be included in allowed_models")
         if set(self.project_limits.allowed_models) != set(
+            self.project_limits.model_providers
+        ):
+            raise ValueError(
+                "model_providers must exactly match allowed_models"
+            )
+        if set(self.project_limits.allowed_models) != set(
             self.pricing.models
         ):
             raise ValueError(
                 "pricing models must exactly match allowed_models"
             )
+        if (
+            self.project_limits.model_providers[self.model]
+            != self.provider
+        ):
+            raise ValueError("model is not available from the provider")
         if (
             self.max_output_tokens
             > self.project_limits.maximum_output_tokens_per_request

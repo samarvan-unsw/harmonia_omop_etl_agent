@@ -50,6 +50,7 @@ def run_agent_with_specs(
     config: dict,
     max_iterations: int = 6,
     promote_output: bool = False,
+    provider_api_key: str | None = None,
 ) -> dict:
     """Generate SQL from validated specs, optionally promoting it locally."""
     if max_iterations < 1:
@@ -74,7 +75,7 @@ def run_agent_with_specs(
         tools=TOOL_SCHEMAS,
         maximum_characters=config["max_initial_prompt_characters"],
     )
-    provider = load_provider(config)
+    provider = load_provider(config, api_key=provider_api_key)
 
     candidate_id = uuid4().hex
     output_written = False

@@ -41,6 +41,10 @@ Never prefix either variable with `NEXT_PUBLIC_`. Configure production and
 preview environments deliberately; use separate tokens when isolation is
 required.
 
+No Anthropic key is required in Vercel for bring-your-own-key runs. The UI
+forwards the user-entered key to `/v1/generate` in a private header for that
+request only; the agent does not persist or log it.
+
 ## Connect the UI
 
 In the UI Vercel project, set:

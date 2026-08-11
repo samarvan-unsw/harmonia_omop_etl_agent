@@ -17,6 +17,13 @@ project_limits:
     - gpt-5.6-terra
     - gpt-5.6-luna
     - gpt-5.6-sol
+    - claude-sonnet-4-6
+  model_providers:
+    gpt-5.3-codex: codex
+    gpt-5.6-terra: codex
+    gpt-5.6-luna: codex
+    gpt-5.6-sol: codex
+    claude-sonnet-4-6: anthropic
   maximum_output_tokens_per_request: 4000
   maximum_initial_prompt_characters: 50000
   maximum_generation_attempts: 2
@@ -27,7 +34,7 @@ project_limits:
 # models or prices change.
 pricing:
   currency: USD
-  verified_on: 2026-07-30
+  verified_on: 2026-08-11
   models:
     gpt-5.3-codex:
       input_usd_per_million_tokens: 1.75
@@ -49,6 +56,11 @@ pricing:
       cached_input_usd_per_million_tokens: 0.50
       cache_write_input_usd_per_million_tokens: 6.25
       output_usd_per_million_tokens: 30.00
+    claude-sonnet-4-6:
+      input_usd_per_million_tokens: 3.00
+      cached_input_usd_per_million_tokens: 0.30
+      cache_write_input_usd_per_million_tokens: 3.75
+      output_usd_per_million_tokens: 15.00
 
 source:
   reference_style: dbt_ref  # relation | dbt_ref | dbt_source

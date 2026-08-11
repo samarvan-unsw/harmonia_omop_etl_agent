@@ -23,7 +23,6 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
-from openai import OpenAIError
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -34,7 +33,7 @@ from pydantic import (
     model_validator,
 )
 
-from .contracts import AgentConfig, TargetSchemaDocument
+from .contracts import AgentConfig, ProviderName, TargetSchemaDocument
 from .costing import estimated_usage_cost_usd
 from .dialects import SqlDialect
 from .http_middleware import RequestPolicyMiddleware
@@ -44,7 +43,7 @@ from .preflight import (
     build_generation_preflight,
     generation_readiness_blockers,
 )
-from .provider_errors import api_error_message
+from .provider_errors import PROVIDER_API_ERRORS, api_error_message
 from .providers import ProviderConfigurationError
 from .validation import (
     SpecValidationError,
@@ -73,6 +72,8 @@ MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
 MAXIMUM_SCHEMA_BUNDLE_BYTES = 4 * 1024 * 1024
 MAXIMUM_ETL_SPECIFICATION_BYTES = 4 * 1024 * 1024
+MINIMUM_PROVIDER_API_KEY_LENGTH = 20
+MAXIMUM_PROVIDER_API_KEY_LENGTH = 512
 MINIMUM_OUTPUT_TOKENS_PER_REQUEST = 100
 MINIMUM_INITIAL_PROMPT_CHARACTERS = 1_000
 GENERATION_SEMAPHORE = BoundedSemaphore(value=1)
@@ -311,6 +312,7 @@ class ProjectGenerationSettings(StrictApiModel):
         str,
         StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"),
     ] | None = None
+    provider: ProviderName | None = None
     model: Annotated[
         str,
         StringConstraints(
@@ -360,11 +362,20 @@ class ProjectGenerationSettings(StrictApiModel):
         return self
 
 
+class ProviderOption(StrictApiModel):
+    """One generation provider and its server-owned model allowlist."""
+
+    name: ProviderName
+    models: list[str] = Field(min_length=1)
+    requires_api_key: bool
+
+
 class GenerationOptionsResponse(StrictApiModel):
     """Agent-owned allowlists and hard bounds for project settings."""
 
     provider: str
     allowed_models: list[str]
+    providers: list[ProviderOption]
     minimum_output_tokens_per_request: int
     maximum_output_tokens_per_request: int
     minimum_initial_prompt_characters: int
@@ -585,9 +596,28 @@ def generation_options() -> GenerationOptionsResponse:
         ) from error
 
     limits = config["project_limits"]
+    provider_models = {
+        provider_name: [
+            model
+            for model in limits["allowed_models"]
+            if limits["model_providers"][model] == provider_name
+        ]
+        for provider_name in ("codex", "anthropic")
+    }
     return GenerationOptionsResponse(
         provider=config["provider"],
-        allowed_models=limits["allowed_models"],
+        # Keep the original fields scoped to the configured default provider
+        # for backward-compatible project settings.
+        allowed_models=provider_models[config["provider"]],
+        providers=[
+            ProviderOption(
+                name=provider_name,
+                models=models,
+                requires_api_key=provider_name == "anthropic",
+            )
+            for provider_name, models in provider_models.items()
+            if models
+        ],
         minimum_output_tokens_per_request=(
             MINIMUM_OUTPUT_TOKENS_PER_REQUEST
         ),
@@ -890,9 +920,39 @@ def _load_agent_config(
         return config
 
     limits = config["project_limits"]
+    selected_provider = generation_settings.provider
+    selected_model = generation_settings.model
+    if selected_model is not None:
+        model_provider = limits["model_providers"].get(selected_model)
+        if model_provider is None:
+            raise ValueError(
+                "Selected model is not allowed. Choose one of: "
+                + ", ".join(limits["allowed_models"])
+            )
+        if selected_provider is None:
+            selected_provider = model_provider
+        elif selected_provider != model_provider:
+            raise ValueError(
+                "Selected model is not available from the selected provider."
+            )
+    elif (
+        selected_provider is not None
+        and selected_provider != config["provider"]
+    ):
+        selected_model = next(
+            (
+                model
+                for model in limits["allowed_models"]
+                if limits["model_providers"][model] == selected_provider
+            ),
+            None,
+        )
+        if selected_model is None:
+            raise ValueError("The selected provider has no allowed models.")
+
     if (
-        generation_settings.model is not None
-        and generation_settings.model not in limits["allowed_models"]
+        selected_model is not None
+        and selected_model not in limits["allowed_models"]
     ):
         raise ValueError(
             "Selected model is not allowed. Choose one of: "
@@ -932,8 +992,10 @@ def _load_agent_config(
     config["source"]["source_name"] = generation_settings.source_name
     config["output"]["format"] = generation_settings.output_format
     config["output"]["dialect"] = generation_settings.sql_dialect
-    if generation_settings.model is not None:
-        config["model"] = generation_settings.model
+    if selected_provider is not None:
+        config["provider"] = selected_provider
+    if selected_model is not None:
+        config["model"] = selected_model
     if generation_settings.maximum_output_tokens_per_request is not None:
         config["max_output_tokens"] = (
             generation_settings.maximum_output_tokens_per_request
@@ -964,6 +1026,31 @@ def _bounded_generation_diagnostics(result: dict) -> list[str]:
         if isinstance(item, str) and item.strip()
     ][:20]
     return bounded or ["The agent did not produce valid SQL."]
+
+
+def _ephemeral_provider_api_key(
+    provider: ProviderName,
+    supplied_key: str | None,
+) -> tuple[str | None, str | None]:
+    """Validate a transient credential without retaining or returning it."""
+    if provider != "anthropic":
+        if supplied_key:
+            return None, "A per-run API key is only accepted for Claude."
+        return None, None
+    if supplied_key is None:
+        return None, "Enter a Claude API key for this generation run."
+
+    key = supplied_key.strip()
+    if (
+        len(key) < MINIMUM_PROVIDER_API_KEY_LENGTH
+        or len(key) > MAXIMUM_PROVIDER_API_KEY_LENGTH
+        or any(
+            ord(character) < 33 or ord(character) > 126
+            for character in key
+        )
+    ):
+        return None, "The Claude API key format is invalid."
+    return key, None
 
 
 @app.post(
@@ -1236,7 +1323,16 @@ def preflight(request: PreflightRequest) -> PreflightResponse:
     response_model=GenerationResponse,
     dependencies=[Depends(require_api_token)],
 )
-def generate(request: GenerationRequest) -> GenerationResponse:
+def generate(
+    request: GenerationRequest,
+    provider_api_key_header: Annotated[
+        str | None,
+        Header(
+            alias="X-Provider-API-Key",
+            max_length=MAXIMUM_PROVIDER_API_KEY_LENGTH,
+        ),
+    ] = None,
+) -> GenerationResponse:
     """Generate validated SQL after an exact cost-ceiling confirmation."""
     try:
         specs = _validate_request_specifications(request)
@@ -1315,6 +1411,23 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             pricing_verified_on=pricing_verified_on,
         )
 
+    provider_api_key, credential_error = _ephemeral_provider_api_key(
+        config["provider"],
+        provider_api_key_header,
+    )
+    if credential_error:
+        return GenerationResponse(
+            status="blocked",
+            completed=False,
+            omop_table=request.omop_table,
+            errors=[credential_error],
+            output_token_ceiling=current_ceiling,
+            model=config["model"],
+            estimated_maximum_cost_usd=maximum_cost,
+            cost_currency=cost_currency,
+            pricing_verified_on=pricing_verified_on,
+        )
+
     if not GENERATION_SEMAPHORE.acquire(blocking=False):
         return GenerationResponse(
             status="busy",
@@ -1335,20 +1448,23 @@ def generate(request: GenerationRequest) -> GenerationResponse:
             config=config,
             max_iterations=request.max_iterations,
             promote_output=False,
+            provider_api_key=provider_api_key,
         )
     except ProviderConfigurationError:
         return GenerationResponse(
             status="failed",
             completed=False,
             omop_table=request.omop_table,
-            errors=["OpenAI authentication is not configured."],
+            errors=[
+                f"{config['provider'].title()} authentication is not configured."
+            ],
             output_token_ceiling=current_ceiling,
             model=config["model"],
             estimated_maximum_cost_usd=maximum_cost,
             cost_currency=cost_currency,
             pricing_verified_on=pricing_verified_on,
         )
-    except OpenAIError as error:
+    except PROVIDER_API_ERRORS as error:
         return GenerationResponse(
             status="failed",
             completed=False,

@@ -1,6 +1,122 @@
 <mxfile host="65bd71144e">
+    <diagram id="harmonia-paper-architecture" name="Paper architecture">
+        <mxGraphModel dx="1525" dy="822" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1450" pageHeight="820" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="paper-0"/>
+                <mxCell id="paper-1" parent="paper-0"/>
+                <mxCell id="paper-title" value="Harmonia OMOP Studio" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=26;fontStyle=1;fontColor=#17231F;" parent="paper-1" vertex="1">
+                    <mxGeometry x="50" y="28" width="560" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-subtitle" value="Governed workflow from source metadata to implementation-ready OMOP artefacts" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=13;fontColor=#64716C;" parent="paper-1" vertex="1">
+                    <mxGeometry x="50" y="67" width="760" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-authoring-zone" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FAFBFA;strokeColor=#D9DFDC;strokeWidth=1;" parent="paper-1" vertex="1">
+                    <mxGeometry x="50" y="125" width="230" height="425" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-authoring-label" value="01  INPUTS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontStyle=1;fontColor=#52615B;spacingLeft=2;" parent="paper-1" vertex="1">
+                    <mxGeometry x="72" y="147" width="160" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-user" value="&lt;b&gt;Data modeller or clinical analyst&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;font color=&quot;#6D7974&quot;&gt;Defines and reviews the ETL&lt;/font&gt;&lt;/div&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#17231F;fontFamily=Helvetica;fontSize=12;spacing=10;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="75" y="198" width="180" height="82" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-inputs" value="&lt;b&gt;Project inputs&lt;/b&gt;&lt;br&gt;&lt;br&gt;- Source schemas or&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;WhiteRabbit scan&lt;br&gt;- Mapping specifications" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=12;align=left;verticalAlign=top;" parent="paper-1" vertex="1">
+                    <mxGeometry x="75" y="304" width="180" height="106" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-input-note" value="YAML remains the portable specification format." style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;fontColor=#333333;fontFamily=Helvetica;fontSize=11;spacing=10;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="75" y="448" width="180" height="66" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-workspace-zone" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FAFBFA;strokeColor=#D9DFDC;strokeWidth=1;" parent="paper-1" vertex="1">
+                    <mxGeometry x="320" y="125" width="290" height="425" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-workspace-label" value="02  WORKSPACE" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontStyle=1;fontColor=#52615B;spacingLeft=2;" parent="paper-1" vertex="1">
+                    <mxGeometry x="342" y="147" width="180" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-ui" value="&lt;b&gt;Harmonia web application&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;Next.js · Vercel&lt;/font&gt;&lt;br&gt;&lt;br&gt;Schema and mapping workspace&lt;br&gt;Review, validate and download" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#607B72;strokeWidth=1.6;fontColor=#17231F;fontFamily=Helvetica;fontSize=12;spacing=12;align=left;verticalAlign=top;" parent="paper-1" vertex="1">
+                    <mxGeometry x="350" y="198" width="230" height="112" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-supabase" value="&lt;b&gt;Supabase&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;Authentication · PostgreSQL&lt;/font&gt;&lt;br&gt;&lt;br&gt;Projects and versioned specifications&lt;br&gt;Validation state, runs and artefacts" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F1F4F2;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=12;align=left;verticalAlign=top;" parent="paper-1" vertex="1">
+                    <mxGeometry x="350" y="410" width="230" height="104" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-execution-zone" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FAFBFA;strokeColor=#D9DFDC;strokeWidth=1;" parent="paper-1" vertex="1">
+                    <mxGeometry x="660" y="125" width="340" height="425" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-execution-label" value="03  CONTROLLED EXECUTION" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontStyle=1;fontColor=#52615B;spacingLeft=2;" parent="paper-1" vertex="1">
+                    <mxGeometry x="682" y="147" width="240" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-agent" value="&lt;b&gt;Python agent service&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;FastAPI · independently deployable&lt;/font&gt;&lt;br&gt;&lt;br&gt;Contract validation and preflight&lt;br&gt;OMOP v5.4 target reference&lt;br&gt;Deterministic ETL and DDL documents&lt;br&gt;Bounded SQL generation and output checks" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#EAF0ED;strokeColor=#607B72;strokeWidth=1.8;fontColor=#17231F;fontFamily=Helvetica;fontSize=12;spacing=12;align=left;verticalAlign=top;" parent="paper-1" vertex="1">
+                    <mxGeometry x="690" y="198" width="280" height="142" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-openai" value="&lt;b&gt;OpenAI API&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;Confirmed SQL generation only&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=12;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="697.5" y="454" width="265" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-delivery-zone" value="" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FAFBFA;strokeColor=#D9DFDC;strokeWidth=1;" parent="paper-1" vertex="1">
+                    <mxGeometry x="1050" y="125" width="220" height="425" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-delivery-label" value="04  OUTPUTS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontStyle=1;fontColor=#52615B;spacingLeft=2;" parent="paper-1" vertex="1">
+                    <mxGeometry x="1072" y="147" width="160" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-sql" value="&lt;b&gt;SQL / dbt models&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;LLM-assisted, validated&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=10;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="1073" y="198" width="175" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-etl" value="&lt;b&gt;ETL specification&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;Word · PDF · Markdown&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=10;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="1073" y="280" width="175" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-ddl" value="&lt;b&gt;Schema bundles&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;DDL or dbt contracts&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=10;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="1073" y="370" width="175" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-audit" value="&lt;b&gt;Versioned evidence&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#6D7974&quot;&gt;Reviews, validation and runs&lt;/font&gt;" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#F1F4F2;strokeColor=#C9D2CE;strokeWidth=1.4;fontColor=#27332F;fontFamily=Helvetica;fontSize=12;spacing=10;align=left;verticalAlign=middle;" parent="paper-1" vertex="1">
+                    <mxGeometry x="1073" y="454" width="175" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-legend-solid" value="System flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=10;fontColor=#64716C;" parent="paper-1" vertex="1">
+                    <mxGeometry x="108" y="580" width="90" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-legend-line-solid" style="edgeStyle=none;rounded=0;html=1;strokeColor=#607B72;strokeWidth=1.8;endArrow=block;endFill=1;" parent="paper-1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="53" y="590" as="sourcePoint"/>
+                        <mxPoint x="93" y="590" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="paper-legend-dashed" value="LLM call" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=10;fontColor=#64716C;" parent="paper-1" vertex="1">
+                    <mxGeometry x="298" y="580" width="80" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-legend-line-dashed" style="edgeStyle=none;rounded=0;html=1;strokeColor=#88938F;strokeWidth=1.6;dashed=1;dashPattern=5 4;endArrow=block;endFill=1;" parent="paper-1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="243" y="590" as="sourcePoint"/>
+                        <mxPoint x="283" y="590" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="paper-user-input-edge" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9AA6A1;strokeWidth=1.5;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="paper-1" source="paper-user" target="paper-inputs" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-input-ui-edge" value="author + upload" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#607B72;strokeWidth=1.8;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=9;fontColor=#64716C;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.45;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" parent="paper-1" source="paper-inputs" target="paper-ui" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-ui-supabase-edge" value="auth + versioned data" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#607B72;strokeWidth=1.8;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=9;fontColor=#64716C;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="paper-1" source="paper-ui" target="paper-supabase" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-ui-agent-edge" value="authenticated API" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#607B72;strokeWidth=1.8;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=9;fontColor=#64716C;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.48;exitDx=0;exitDy=0;entryX=0;entryY=0.48;entryDx=0;entryDy=0;" parent="paper-1" source="paper-ui" target="paper-agent" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-agent-openai-edge" value="generation only" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#88938F;strokeWidth=1.6;dashed=1;dashPattern=5 4;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=9;fontColor=#64716C;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="paper-1" source="paper-agent" target="paper-openai" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-agent-output-edge" value="validated artefacts" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#607B72;strokeWidth=1.8;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=9;fontColor=#64716C;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.48;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="paper-1" source="paper-agent" target="paper-output-sql" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-stack-1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#AAB4B0;strokeWidth=1.2;endArrow=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="paper-1" source="paper-output-sql" target="paper-output-etl" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-stack-2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#AAB4B0;strokeWidth=1.2;endArrow=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="paper-1" source="paper-output-etl" target="paper-output-ddl" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="paper-output-stack-3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#AAB4B0;strokeWidth=1.2;endArrow=none;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="paper-1" source="paper-output-ddl" target="paper-output-audit" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
     <diagram id="harmonia-omop-architecture" name="Architecture">
-        <mxGraphModel dx="2101" dy="977" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+        <mxGraphModel dx="691" dy="295" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>

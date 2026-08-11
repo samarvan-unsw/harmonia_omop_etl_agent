@@ -1,4 +1,15 @@
-"""Translate OpenAI SDK exceptions into safe, actionable user-facing messages."""
+"""Translate provider SDK exceptions into safe user-facing messages."""
+
+from anthropic import (
+    APIConnectionError as AnthropicConnectionError,
+    APIError as AnthropicError,
+    APIStatusError as AnthropicStatusError,
+    APITimeoutError as AnthropicTimeoutError,
+    AuthenticationError as AnthropicAuthenticationError,
+    BadRequestError as AnthropicBadRequestError,
+    PermissionDeniedError as AnthropicPermissionDeniedError,
+    RateLimitError as AnthropicRateLimitError,
+)
 
 from openai import (
     APIConnectionError,
@@ -12,8 +23,30 @@ from openai import (
 )
 
 
-def api_error_message(error: OpenAIError) -> str:
+PROVIDER_API_ERRORS = (OpenAIError, AnthropicError)
+
+
+def api_error_message(error: Exception) -> str:
     """Return a safe provider error without request or specification data."""
+    if isinstance(error, AnthropicAuthenticationError):
+        return "Claude authentication failed; check the API key for this run."
+    if isinstance(error, AnthropicPermissionDeniedError):
+        return "Claude denied access to the selected model."
+    if isinstance(error, AnthropicRateLimitError):
+        return "Claude API rate limit or quota was reached; retry later."
+    if isinstance(error, AnthropicTimeoutError):
+        return "Claude API request timed out."
+    if isinstance(error, AnthropicConnectionError):
+        return "Could not connect to the Claude API."
+    if isinstance(error, AnthropicBadRequestError):
+        return (
+            "Claude rejected the request; "
+            "check the model and request configuration."
+        )
+    if isinstance(error, AnthropicStatusError):
+        return f"Claude API returned HTTP {error.status_code}."
+    if isinstance(error, AnthropicError):
+        return "Claude API request failed."
     if isinstance(error, AuthenticationError):
         return "OpenAI authentication failed; check OPENAI_API_KEY."
     if isinstance(error, PermissionDeniedError):

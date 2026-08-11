@@ -275,6 +275,26 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(
+            result["providers"],
+            [
+                {
+                    "name": "codex",
+                    "models": [
+                        "gpt-5.3-codex",
+                        "gpt-5.6-terra",
+                        "gpt-5.6-luna",
+                        "gpt-5.6-sol",
+                    ],
+                    "requires_api_key": False,
+                },
+                {
+                    "name": "anthropic",
+                    "models": ["claude-sonnet-4-6"],
+                    "requires_api_key": True,
+                },
+            ],
+        )
+        self.assertEqual(
             result["maximum_output_tokens_per_request"],
             4000,
         )
@@ -722,7 +742,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertGreater(result["estimated_maximum_cost_usd"], 0)
         self.assertEqual(result["cost_currency"], "USD")
-        self.assertEqual(result["pricing_verified_on"], "2026-07-30")
+        self.assertEqual(result["pricing_verified_on"], "2026-08-11")
         self.assertIn("Pending mapping reviews", result["blockers"][0])
 
     async def test_preflight_applies_safe_project_generation_settings(self):
@@ -903,7 +923,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["estimated_actual_cost_usd"], 0.0005635)
         self.assertGreater(result["estimated_maximum_cost_usd"], 0)
         self.assertEqual(result["cost_currency"], "USD")
-        self.assertEqual(result["pricing_verified_on"], "2026-07-30")
+        self.assertEqual(result["pricing_verified_on"], "2026-08-11")
         self.assertNotIn("transcript", result)
         run_agent.assert_called_once()
         self.assertFalse(
@@ -912,6 +932,106 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             run_agent.call_args.kwargs["config"]["output"]["dialect"],
             "postgres",
+        )
+
+    async def test_claude_generation_requires_a_per_run_api_key(self):
+        self.approve_mapping_reviews()
+        self.payload["confirmed_output_token_ceiling"] = 1600
+        self.payload["generation_settings"] = {
+            "sql_dialect": "postgres",
+            "output_format": "sql",
+            "source_reference_style": "relation",
+            "source_name": None,
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6",
+        }
+
+        with (
+            patch.dict(os.environ, {"AGENT_API_TOKEN": self.API_TOKEN}),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/generate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        result = response.json()
+        self.assertFalse(result["completed"])
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(
+            result["errors"],
+            ["Enter a Claude API key for this generation run."],
+        )
+        run_agent.assert_not_called()
+
+    async def test_claude_key_is_forwarded_only_to_the_provider_factory(self):
+        self.approve_mapping_reviews()
+        self.payload["confirmed_output_token_ceiling"] = 1600
+        self.payload["generation_settings"] = {
+            "sql_dialect": "postgres",
+            "output_format": "sql",
+            "source_reference_style": "relation",
+            "source_name": None,
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6",
+        }
+        provider_key = "sk-ant-test-ephemeral-provider-key"
+        generated_result = {
+            "status": "done",
+            "iterations": 1,
+            "output_sql": "select 1 as person_id",
+            "output_artifacts": [
+                {
+                    "file_name": "person.sql",
+                    "content": "select 1 as person_id",
+                    "media_type": "application/sql",
+                    "category": "transformation",
+                },
+                {
+                    "file_name": "create_tables.sql",
+                    "content": "create table person (person_id integer);",
+                    "media_type": "application/sql",
+                    "category": "ddl",
+                },
+            ],
+            "usage": {
+                "successful_api_responses": 1,
+                "input_tokens": 100,
+                "cached_input_tokens": 0,
+                "cache_write_input_tokens": 0,
+                "output_tokens": 30,
+                "reasoning_output_tokens": 0,
+                "total_tokens": 130,
+            },
+        }
+
+        with (
+            patch.dict(os.environ, {"AGENT_API_TOKEN": self.API_TOKEN}),
+            patch(
+                "agent.api.run_agent_with_specs",
+                return_value=generated_result,
+            ) as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/generate",
+                json=self.payload,
+                headers={
+                    **self.headers,
+                    "X-Provider-API-Key": provider_key,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["completed"])
+        self.assertNotIn(provider_key, response.text)
+        self.assertEqual(
+            run_agent.call_args.kwargs["provider_api_key"],
+            provider_key,
+        )
+        self.assertEqual(
+            run_agent.call_args.kwargs["config"]["provider"],
+            "anthropic",
         )
 
     async def test_generation_returns_bounded_validator_diagnostics(self):
