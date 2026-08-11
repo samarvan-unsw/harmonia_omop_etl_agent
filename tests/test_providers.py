@@ -34,6 +34,27 @@ class ProviderFactoryTest(unittest.TestCase):
             model="test-model",
         )
 
+    def test_openai_uses_explicit_ephemeral_key_before_environment(self):
+        with (
+            patch.dict(
+                os.environ,
+                {"OPENAI_API_KEY": "environment-secret"},
+                clear=True,
+            ),
+            patch("agent.providers.CodexProvider") as provider,
+        ):
+            load_provider(
+                {"provider": "codex", "model": "test-model"},
+                api_key="  per-run-secret  ",
+            )
+
+        provider.assert_called_once_with(
+            api_key="per-run-secret",
+            max_api_retries=0,
+            max_output_tokens=2000,
+            model="test-model",
+        )
+
     def test_anthropic_uses_explicit_ephemeral_key_before_environment(self):
         with (
             patch.dict(

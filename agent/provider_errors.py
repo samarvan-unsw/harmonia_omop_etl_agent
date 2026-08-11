@@ -48,7 +48,7 @@ def api_error_message(error: Exception) -> str:
     if isinstance(error, AnthropicError):
         return "Claude API request failed."
     if isinstance(error, AuthenticationError):
-        return "OpenAI authentication failed; check OPENAI_API_KEY."
+        return "OpenAI authentication failed; check the supplied API key."
     if isinstance(error, PermissionDeniedError):
         return "OpenAI denied access to the configured project or model."
     if isinstance(error, RateLimitError):

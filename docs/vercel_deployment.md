@@ -34,16 +34,16 @@ Add these server-side environment variables to the agent Vercel project:
 
 ```text
 AGENT_API_TOKEN=<a private token of at least 32 characters>
-OPENAI_API_KEY=<the OpenAI project API key>
 ```
 
-Never prefix either variable with `NEXT_PUBLIC_`. Configure production and
+Never prefix this variable with `NEXT_PUBLIC_`. Configure production and
 preview environments deliberately; use separate tokens when isolation is
 required.
 
-No Anthropic key is required in Vercel for bring-your-own-key runs. The UI
-forwards the user-entered key to `/v1/generate` in a private header for that
-request only; the agent does not persist or log it.
+No provider key is required in Vercel for bring-your-own-key runs. The UI
+forwards the user-entered OpenAI or Anthropic key to `/v1/generate` in a
+private header for that request only; the agent does not persist or log it.
+`OPENAI_API_KEY` and `ANTHROPIC_API_KEY` remain supported for local CLI use.
 
 ## Connect the UI
 

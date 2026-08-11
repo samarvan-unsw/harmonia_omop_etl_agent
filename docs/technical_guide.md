@@ -67,11 +67,13 @@ it statically without connecting to a warehouse.
 
 `.env` contains secrets:
 
-- `OPENAI_API_KEY` for paid generation.
+- `OPENAI_API_KEY` for optional local OpenAI generation.
 - `ANTHROPIC_API_KEY` for optional local Claude generation.
 - `AGENT_API_TOKEN` when the HTTP API is enabled.
 
 Validation and preflight do not require a provider key.
+Hosted OpenAI and Claude generation instead receive a transient provider key
+from the UI; the API validates and forwards it without persistence.
 
 ### Verification
 
@@ -1069,8 +1071,8 @@ and only for the current request. Models are explicitly mapped to providers.
 ### `.env`
 
 Stores local CLI provider keys and the optional `AGENT_API_TOKEN`. It is loaded
-only at runtime and is gitignored. UI-supplied Claude keys are not written to
-this file.
+only at runtime and is gitignored. UI-supplied OpenAI and Claude keys are not
+written to this file.
 
 ### `specs/source_schema/`
 

@@ -20,6 +20,7 @@ from tests.test_whiterabbit import build_scan_report
 
 class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     API_TOKEN = "test-agent-api-token-that-is-at-least-32-characters"
+    PROVIDER_API_KEY = "sk-test-ephemeral-openai-provider-key"
 
     @classmethod
     def setUpClass(cls):
@@ -285,7 +286,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
                         "gpt-5.6-luna",
                         "gpt-5.6-sol",
                     ],
-                    "requires_api_key": False,
+                    "requires_api_key": True,
                 },
                 {
                     "name": "anthropic",
@@ -844,7 +845,10 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             response = await self.client.post(
                 "/v1/generate",
                 json=self.payload,
-                headers=self.headers,
+                headers={
+                    **self.headers,
+                    "X-Provider-API-Key": self.PROVIDER_API_KEY,
+                },
             )
 
         self.assertEqual(response.status_code, 200)
@@ -907,7 +911,10 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             response = await self.client.post(
                 "/v1/generate",
                 json=self.payload,
-                headers=self.headers,
+                headers={
+                    **self.headers,
+                    "X-Provider-API-Key": self.PROVIDER_API_KEY,
+                },
             )
 
         self.assertEqual(response.status_code, 200)
@@ -933,6 +940,33 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             run_agent.call_args.kwargs["config"]["output"]["dialect"],
             "postgres",
         )
+        self.assertEqual(
+            run_agent.call_args.kwargs["provider_api_key"],
+            self.PROVIDER_API_KEY,
+        )
+
+    async def test_openai_generation_requires_a_per_run_api_key(self):
+        self.approve_mapping_reviews()
+        self.payload["confirmed_output_token_ceiling"] = 1600
+
+        with (
+            patch.dict(os.environ, {"AGENT_API_TOKEN": self.API_TOKEN}),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/generate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        result = response.json()
+        self.assertFalse(result["completed"])
+        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(
+            result["errors"],
+            ["Enter an OpenAI API key for this generation run."],
+        )
+        run_agent.assert_not_called()
 
     async def test_claude_generation_requires_a_per_run_api_key(self):
         self.approve_mapping_reviews()
@@ -1069,7 +1103,10 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             response = await self.client.post(
                 "/v1/generate",
                 json=self.payload,
-                headers=self.headers,
+                headers={
+                    **self.headers,
+                    "X-Provider-API-Key": self.PROVIDER_API_KEY,
+                },
             )
 
         result = response.json()

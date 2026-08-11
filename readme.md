@@ -71,7 +71,7 @@ cp .env.example .env
 
 For local CLI generation, set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` to match
 the provider selected in `config.yaml`. Never commit the `.env` file. Hosted
-Claude generation can instead receive a transient per-run key from the UI.
+OpenAI and Claude generation receive a transient per-run key from the UI.
 
 ## Common commands
 

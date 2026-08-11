@@ -488,7 +488,9 @@ tool-argument manipulation and requests to exceed the assigned role.
 ## Security checklist
 
 - Keep secrets in an approved secret manager or environment configuration.
-- Never expose provider keys to the browser.
+- Never expose platform-owned provider keys to the browser. If users bring
+  their own keys, keep them transient and send them only to the trusted
+  backend over TLS for the requested operation.
 - Authenticate and authorize every agent action.
 - Validate all external input at the boundary.
 - Treat uploaded content as untrusted.

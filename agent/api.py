@@ -613,7 +613,7 @@ def generation_options() -> GenerationOptionsResponse:
             ProviderOption(
                 name=provider_name,
                 models=models,
-                requires_api_key=provider_name == "anthropic",
+                requires_api_key=True,
             )
             for provider_name, models in provider_models.items()
             if models
@@ -1033,12 +1033,13 @@ def _ephemeral_provider_api_key(
     supplied_key: str | None,
 ) -> tuple[str | None, str | None]:
     """Validate a transient credential without retaining or returning it."""
-    if provider != "anthropic":
-        if supplied_key:
-            return None, "A per-run API key is only accepted for Claude."
-        return None, None
+    provider_label = "Claude" if provider == "anthropic" else "OpenAI"
     if supplied_key is None:
-        return None, "Enter a Claude API key for this generation run."
+        article = "an" if provider == "codex" else "a"
+        return None, (
+            f"Enter {article} {provider_label} API key "
+            "for this generation run."
+        )
 
     key = supplied_key.strip()
     if (
@@ -1049,7 +1050,7 @@ def _ephemeral_provider_api_key(
             for character in key
         )
     ):
-        return None, "The Claude API key format is invalid."
+        return None, f"The {provider_label} API key format is invalid."
     return key, None
 
 
