@@ -224,6 +224,75 @@ class SourceForeignKey(StrictModel):
     field: SqlIdentifier
 
 
+class SourceLineage(StrictModel):
+    """Optional, non-authoritative lineage retained from imported metadata."""
+
+    model: SqlIdentifier | None = None
+    field: SqlIdentifier | None = None
+    expression: str | None = Field(default=None, max_length=5_000)
+    transformation: str | None = Field(default=None, max_length=5_000)
+
+
+class SourceTerminology(StrictModel):
+    """Optional terminology hints used only to improve mapping review."""
+
+    status: str | None = Field(default=None, max_length=255)
+    vocabulary: str | None = Field(default=None, max_length=255)
+    version: str | None = Field(default=None, max_length=255)
+    representation: str | None = Field(default=None, max_length=255)
+
+
+class SourceColumnSemantic(StrictModel):
+    """Bounded semantic hints for one source field."""
+
+    role: str | None = Field(default=None, max_length=255)
+    semantic_type: str | None = Field(default=None, max_length=255)
+    value_type: str | None = Field(default=None, max_length=255)
+    identifier_scope: str | None = Field(default=None, max_length=255)
+    unit: str | None = Field(default=None, max_length=255)
+    sensitivity: str | None = Field(default=None, max_length=255)
+    filterable: bool | None = None
+    groupable: bool | None = None
+    aggregatable: bool | None = None
+    default_aggregation: str | None = Field(default=None, max_length=255)
+    synonyms: list[str] = Field(default_factory=list, max_length=100)
+    allowed_values: list[str] = Field(default_factory=list, max_length=500)
+    terminology: SourceTerminology | None = None
+    source: SourceLineage | None = None
+
+
+class SourceAlternateKey(StrictModel):
+    """A declared or inferred candidate key retained for review."""
+
+    columns: list[SqlIdentifier] = Field(min_length=1, max_length=100)
+    meaning: str = Field(default="", max_length=1_000)
+
+
+class SourceIncomingReference(StrictModel):
+    """An inverse relationship hint supplied by source metadata."""
+
+    model: SqlIdentifier
+    field: SqlIdentifier
+    relationship: str | None = Field(default=None, max_length=255)
+
+
+class SourceModelSemantic(StrictModel):
+    """Bounded semantic hints for one source model."""
+
+    entity: str | None = Field(default=None, max_length=255)
+    subject_area: str | None = Field(default=None, max_length=255)
+    grain: str | None = Field(default=None, max_length=1_000)
+    source_model: SqlIdentifier | None = None
+    alternate_keys: list[SourceAlternateKey] = Field(
+        default_factory=list,
+        max_length=100,
+    )
+    referenced_by: list[SourceIncomingReference] = Field(
+        default_factory=list,
+        max_length=500,
+    )
+
+
 class SourceColumn(StrictModel):
     """A source column available for OMOP mapping."""
 
@@ -232,6 +301,7 @@ class SourceColumn(StrictModel):
     description: str = Field(default="", max_length=10_000)
     primary_key: bool = False
     foreign_key: SourceForeignKey | None = None
+    semantic: SourceColumnSemantic | None = None
 
 
 class SourceModel(StrictModel):
@@ -239,6 +309,7 @@ class SourceModel(StrictModel):
 
     name: SqlIdentifier
     description: str = Field(default="", max_length=10_000)
+    semantic: SourceModelSemantic | None = None
     columns: list[SourceColumn] = Field(
         default_factory=list,
         max_length=10_000,

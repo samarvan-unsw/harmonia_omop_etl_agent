@@ -204,6 +204,52 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.status_code, 415)
 
+    async def test_normalizes_source_schema_without_ai(self):
+        with (
+            patch.dict(
+                os.environ,
+                {"AGENT_API_TOKEN": self.API_TOKEN},
+            ),
+            patch("agent.api.run_agent_with_specs") as run_agent,
+        ):
+            response = await self.client.post(
+                "/v1/source-schemas/normalize",
+                headers=self.headers,
+                json={
+                    "files": [
+                        {
+                            "file_name": "patient.yml",
+                            "content": (
+                                "version: 2\nmodels:\n- name: patient\n"
+                                "  columns:\n  - name: patient_id\n"
+                                "    data_type: integer\n"
+                                "    primary_key: true\n"
+                            ),
+                        }
+                    ]
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["model_count"], 1)
+        self.assertEqual(
+            response.json()["documents"][0]["file_name"],
+            "patient.yml",
+        )
+        run_agent.assert_not_called()
+
+    async def test_source_schema_normalization_requires_authentication(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+        ):
+            response = await self.client.post(
+                "/v1/source-schemas/normalize",
+                json={"files": []},
+            )
+
+        self.assertEqual(response.status_code, 401)
+
     async def test_imports_whiterabbit_report_without_ai(self):
         with (
             patch.dict(

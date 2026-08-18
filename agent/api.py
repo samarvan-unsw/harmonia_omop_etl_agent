@@ -45,6 +45,11 @@ from .preflight import (
 )
 from .provider_errors import PROVIDER_API_ERRORS, api_error_message
 from .providers import ProviderConfigurationError
+from .source_schema_import import (
+    SourceSchemaImportError,
+    SourceSchemaImportResult,
+    normalize_source_schema_files,
+)
 from .validation import (
     SpecValidationError,
     ValidatedSpecs,
@@ -68,6 +73,7 @@ MAXIMUM_DOCUMENT_BYTES = 750 * 1024
 MAXIMUM_SPECIFICATION_BYTES = 2 * 1024 * 1024
 MAXIMUM_REQUEST_BYTES = 4 * 1024 * 1024
 MAXIMUM_WHITERABBIT_BYTES = 3 * 1024 * 1024
+MAXIMUM_SOURCE_SCHEMA_IMPORT_BYTES = 3 * 1024 * 1024
 MINIMUM_API_TOKEN_LENGTH = 32
 MAXIMUM_API_RUN_OUTPUT_TOKENS = 20_000
 MAXIMUM_SCHEMA_BUNDLE_BYTES = 4 * 1024 * 1024
@@ -91,6 +97,13 @@ YamlFileName = Annotated[
     str,
     StringConstraints(
         pattern=r"^[A-Za-z_][A-Za-z0-9_]*\.yml$",
+        max_length=255,
+    ),
+]
+SourceSchemaImportFileName = Annotated[
+    str,
+    StringConstraints(
+        pattern=r"^[A-Za-z0-9_. -]+\.(?:yml|yaml|json)$",
         max_length=255,
     ),
 ]
@@ -131,6 +144,40 @@ class YamlSpecification(StrictApiModel):
                 f"YAML content must not exceed {MAXIMUM_DOCUMENT_BYTES} bytes"
             )
         return value
+
+
+class SourceSchemaImportFile(StrictApiModel):
+    """One schema-like YAML or JSON input selected for normalization."""
+
+    file_name: SourceSchemaImportFileName
+    content: str = Field(min_length=1)
+
+    @field_validator("content")
+    @classmethod
+    def enforce_import_file_size(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > MAXIMUM_DOCUMENT_BYTES:
+            raise ValueError(
+                f"schema input must not exceed {MAXIMUM_DOCUMENT_BYTES} bytes"
+            )
+        return value
+
+
+class SourceSchemaImportRequest(StrictApiModel):
+    """Bounded collection of files to normalize deterministically."""
+
+    files: list[SourceSchemaImportFile] = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_import_files(self) -> "SourceSchemaImportRequest":
+        file_names = [item.file_name for item in self.files]
+        if len(file_names) != len(set(file_names)):
+            raise ValueError("source schema input filenames must be unique")
+        total_bytes = sum(
+            len(item.content.encode("utf-8")) for item in self.files
+        )
+        if total_bytes > MAXIMUM_SOURCE_SCHEMA_IMPORT_BYTES:
+            raise ValueError("combined schema input exceeds the 3 MB limit")
+        return self
 
 
 class ValidationRequest(StrictApiModel):
@@ -574,6 +621,26 @@ async def import_whiterabbit_report(request: Request) -> WhiteRabbitImportResult
     try:
         return parse_whiterabbit_report(content)
     except WhiteRabbitReportError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(error),
+        ) from error
+
+
+@app.post(
+    "/v1/source-schemas/normalize",
+    response_model=SourceSchemaImportResult,
+    dependencies=[Depends(require_api_token)],
+)
+def normalize_source_schemas(
+    request: SourceSchemaImportRequest,
+) -> SourceSchemaImportResult:
+    """Normalize supported schema YAML or JSON without invoking AI."""
+    try:
+        return normalize_source_schema_files(
+            [(item.file_name, item.content) for item in request.files]
+        )
+    except SourceSchemaImportError as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),

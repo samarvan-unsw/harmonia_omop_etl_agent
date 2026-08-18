@@ -160,6 +160,7 @@ The practical sequence is:
 | `agent.cli` | User entry point, preflight, cost guard and logging | User |
 | `agent.contracts` | Pydantic contracts for configuration and YAML | Validation and CLI |
 | `agent.yaml_loader` | Safe YAML parsing with duplicate-key and alias limits | Validation, API, CLI and artifacts |
+| `agent.source_schema_import` | Deterministic normalization of Harmonia, dbt and generic YAML/JSON source metadata | Authenticated import API and UI preview |
 | `agent.validation` | File and in-memory cross-specification validation | CLI, API, context and loop |
 | `agent.api` | Authenticated HTTP validation and preflight interface | UI or another server |
 | `agent.http_middleware` | Streamed request-size enforcement and request tracing | HTTP API |
@@ -494,6 +495,10 @@ only the explicitly confirmed generation endpoint may do so.
   report and deterministically returns one validated source-schema YAML per
   table plus aggregate profiling metadata. It ignores value-frequency sheets,
   rejects macros and external links, and never constructs an AI provider.
+- `POST /v1/source-schemas/normalize` accepts bounded YAML or JSON and returns
+  strict one-model-per-file Harmonia YAML with extraction evidence, ignored
+  paths and warnings. It retains supported datatypes, keys, dbt relationships,
+  lineage and semantic hints without constructing an AI provider.
 - `POST /v1/validate` accepts source-schema and mapping YAML, loads the
   agent-owned target schema and returns validation and review readiness.
 - `POST /v1/etl-specification/{output_format}` accepts the same specification

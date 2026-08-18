@@ -15,6 +15,11 @@ It can also convert bounded OHDSI WhiteRabbit `.xlsx` scan reports into
 validated source-schema YAML and aggregate source-profile metadata without an
 OpenAI request. Per-table value-frequency sheets are deliberately ignored.
 
+An authenticated deterministic endpoint also normalizes Harmonia, dbt and
+simple table/field YAML or JSON into strict one-model-per-file YAML. It retains
+datatypes, explicit keys, relationships, lineage and bounded semantic hints
+while excluding operational dbt configuration.
+
 ## Architecture
 
 ```text
