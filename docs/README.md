@@ -8,5 +8,7 @@
   safeguards and extension points.
 - [Vercel deployment](vercel_deployment.md): deploy the authenticated agent
   API.
+- [Platform setup and account migration](https://github.com/Cardiac-Analytics-Innovation/harmonia_omop_ui/blob/main/docs/platform_setup_and_migration.md):
+  coordinated Supabase, UI, SQL-agent and mapping-agent setup.
 - [Development roadmap](development_plan.md): optional future improvements.
 - `harmonia_omop_architecture.drawio`: editable architecture diagram.

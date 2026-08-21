@@ -563,7 +563,11 @@ def require_api_token(
     authorization: Annotated[str | None, Header()] = None,
 ) -> None:
     """Authenticate private server-to-server API calls."""
-    configured_token = os.getenv("AGENT_API_TOKEN")
+    # Prefer the explicit ETL-agent name. Keep the legacy variable as a
+    # migration fallback so existing deployments can rotate without downtime.
+    configured_token = os.getenv("ETL_AGENT_API_TOKEN") or os.getenv(
+        "AGENT_API_TOKEN"
+    )
     if (
         not configured_token
         or len(configured_token) < MINIMUM_API_TOKEN_LENGTH

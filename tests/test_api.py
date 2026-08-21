@@ -117,7 +117,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_target_catalog_requires_bearer_token(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get("/v1/target-schemas")
 
@@ -166,7 +166,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch(
                 "agent.api.parse_whiterabbit_report",
@@ -194,7 +194,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_whiterabbit_import_rejects_wrong_media_type(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/source-schemas/whiterabbit",
@@ -208,7 +208,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
@@ -241,7 +241,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_source_schema_normalization_requires_authentication(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/source-schemas/normalize",
@@ -254,7 +254,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
@@ -284,7 +284,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_whiterabbit_import_requires_bearer_token(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/source-schemas/whiterabbit",
@@ -302,7 +302,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_lists_safe_project_generation_options(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/generation-options",
@@ -353,7 +353,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_lists_complete_target_catalog_as_json(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/target-schemas",
@@ -383,7 +383,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
@@ -425,7 +425,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_ddl_download_requires_bearer_token(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get("/v1/ddl/postgres")
 
@@ -437,7 +437,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
@@ -466,7 +466,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_downloads_selected_dbt_contracts_in_cdm_order(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 (
@@ -486,7 +486,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_dbt_bundle_rejects_unknown_target_table(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/schema-bundle/dbt/postgres?tables=imaginary_table",
@@ -498,7 +498,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_ddl_download_rejects_unknown_dialect(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/ddl/sqlite",
@@ -510,7 +510,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_schema_bundle_rejects_unknown_output_format(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/schema-bundle/csv/postgres",
@@ -522,7 +522,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_returns_structured_target_schema_details(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/target-schemas/person",
@@ -553,7 +553,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_target_schema_returns_not_found(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.get(
                 "/v1/target-schemas/not_a_table",
@@ -565,7 +565,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_validation_requires_bearer_token(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/validate",
@@ -576,6 +576,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_validation_refuses_unconfigured_authentication(self):
         with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ETL_AGENT_API_TOKEN", None)
             os.environ.pop("AGENT_API_TOKEN", None)
             response = await self.client.post(
                 "/v1/validate",
@@ -584,6 +585,22 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(response.status_code, 503)
+
+    async def test_validation_accepts_legacy_api_token_during_migration(self):
+        with patch.dict(
+            os.environ,
+            {"AGENT_API_TOKEN": self.API_TOKEN},
+            clear=False,
+        ):
+            os.environ.pop("ETL_AGENT_API_TOKEN", None)
+            response = await self.client.post(
+                "/v1/validate",
+                json=self.payload,
+                headers=self.headers,
+            )
+
+        self.assertNotEqual(response.status_code, 401)
+        self.assertNotEqual(response.status_code, 503)
 
     async def test_downloads_etl_specifications_without_generation(self):
         self.approve_mapping_reviews()
@@ -598,7 +615,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
@@ -630,7 +647,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_etl_specification_requires_approved_reviews(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/etl-specification/md",
@@ -648,7 +665,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.approve_mapping_reviews()
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/etl-specification/md",
@@ -689,7 +706,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         }
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/etl-specification-bundle/md",
@@ -713,7 +730,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
     async def test_validates_without_calling_openai(self):
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/validate",
@@ -740,7 +757,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/validate",
@@ -761,7 +778,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/preflight",
@@ -807,7 +824,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/preflight",
@@ -844,7 +861,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/preflight",
@@ -867,7 +884,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/preflight",
@@ -884,7 +901,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
@@ -947,7 +964,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch(
                 "agent.api.run_agent_with_specs",
@@ -996,7 +1013,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         self.payload["confirmed_output_token_ceiling"] = 1600
 
         with (
-            patch.dict(os.environ, {"AGENT_API_TOKEN": self.API_TOKEN}),
+            patch.dict(os.environ, {"ETL_AGENT_API_TOKEN": self.API_TOKEN}),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
             response = await self.client.post(
@@ -1027,7 +1044,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         }
 
         with (
-            patch.dict(os.environ, {"AGENT_API_TOKEN": self.API_TOKEN}),
+            patch.dict(os.environ, {"ETL_AGENT_API_TOKEN": self.API_TOKEN}),
             patch("agent.api.run_agent_with_specs") as run_agent,
         ):
             response = await self.client.post(
@@ -1087,7 +1104,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         }
 
         with (
-            patch.dict(os.environ, {"AGENT_API_TOKEN": self.API_TOKEN}),
+            patch.dict(os.environ, {"ETL_AGENT_API_TOKEN": self.API_TOKEN}),
             patch(
                 "agent.api.run_agent_with_specs",
                 return_value=generated_result,
@@ -1139,7 +1156,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(
                 os.environ,
-                {"AGENT_API_TOKEN": self.API_TOKEN},
+                {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
             ),
             patch(
                 "agent.api.run_agent_with_specs",
@@ -1170,7 +1187,7 @@ class ValidationApiTest(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(
             os.environ,
-            {"AGENT_API_TOKEN": self.API_TOKEN},
+            {"ETL_AGENT_API_TOKEN": self.API_TOKEN},
         ):
             response = await self.client.post(
                 "/v1/validate",

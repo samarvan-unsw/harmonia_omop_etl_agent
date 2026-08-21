@@ -69,7 +69,7 @@ it statically without connecting to a warehouse.
 
 - `OPENAI_API_KEY` for optional local OpenAI generation.
 - `ANTHROPIC_API_KEY` for optional local Claude generation.
-- `AGENT_API_TOKEN` when the HTTP API is enabled.
+- `ETL_AGENT_API_TOKEN` when the HTTP API is enabled.
 
 Validation and preflight do not require a provider key.
 Hosted OpenAI and Claude generation instead receive a transient provider key
@@ -105,7 +105,7 @@ uvicorn agent.api:app --reload --env-file .env
 curl http://127.0.0.1:8000/health
 ```
 
-The UI and API must use the same `AGENT_API_TOKEN`. A deployed UI cannot call a
+The UI and API must use the same `ETL_AGENT_API_TOKEN`. A deployed UI cannot call a
 local API through `127.0.0.1`; configure a deployed HTTPS API URL instead.
 
 ### Deployment order
@@ -521,7 +521,7 @@ only the explicitly confirmed generation endpoint may do so.
   measured usage and its estimated cost. It does not return the internal
   transcript or overwrite the CLI output file.
 
-Validation requests require a bearer token matching `AGENT_API_TOKEN`.
+Validation requests require a bearer token matching `ETL_AGENT_API_TOKEN`.
 Request documents and total request content have bounded sizes. The HTTP
 boundary checks both declared content length and bytes actually received, so
 chunked requests cannot bypass the limit. Error responses omit submitted
@@ -1075,7 +1075,7 @@ and only for the current request. Models are explicitly mapped to providers.
 
 ### `.env`
 
-Stores local CLI provider keys and the optional `AGENT_API_TOKEN`. It is loaded
+Stores local CLI provider keys and the optional `ETL_AGENT_API_TOKEN`. It is loaded
 only at runtime and is gitignored. UI-supplied OpenAI and Claude keys are not
 written to this file.
 

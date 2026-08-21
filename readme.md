@@ -155,7 +155,7 @@ Important mapping rules:
 
 ## HTTP API
 
-Generate a private token and place it in `.env` as `AGENT_API_TOKEN`:
+Generate a private token and place it in `.env` as `ETL_AGENT_API_TOKEN`:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"

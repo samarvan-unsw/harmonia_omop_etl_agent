@@ -33,7 +33,7 @@ stored in Supabase; container files are not persistent.
 Add these server-side environment variables to the agent Vercel project:
 
 ```text
-AGENT_API_TOKEN=<a private token of at least 32 characters>
+ETL_AGENT_API_TOKEN=<a private token of at least 32 characters>
 ```
 
 Never prefix this variable with `NEXT_PUBLIC_`. Configure production and
@@ -51,7 +51,7 @@ In the UI Vercel project, set:
 
 ```text
 AGENT_API_BASE_URL=https://<agent-project>.vercel.app
-AGENT_API_TOKEN=<the same private token used by the agent API>
+ETL_AGENT_API_TOKEN=<the same private token used by the agent API>
 ```
 
 Redeploy the UI after changing environment variables.
